@@ -38,6 +38,7 @@
 
 <div align="center"><video src="https://github.com/DAMO-NLP-SG/VideoLLaMA2/assets/18526640/e0e7951c-f392-42ed-afad-b2c7984d3e38" width="800"></div>
 
+$${\color{red}Welcome \space \color{lightblue}To \space \color{orange}Stackoverflow}$$
 
 ## 📰 News
 * **[2024.06.14]**  🔥🔥 [Online Demo](https://huggingface.co/spaces/lixin4ever/VideoLLaMA2) is available.
