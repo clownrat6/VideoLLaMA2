@@ -110,6 +110,8 @@ def build_vision_projector(config, delay_load=False, **kwargs):
         return STCConnector(config)
     elif projector_type == "stp_connector":
         return STPConnector(config)
+    elif projector_type == "stc_connector_v3a":
+        return STCConnectorV3a(config)
     elif projector_type == "stc_connector_v35":
         return STCConnectorV35(config)
     elif projector_type == "spatial_conv":
@@ -233,6 +235,22 @@ class STCConnectorV35(STCConnector):
                 kernel_size=downsample,
                 stride=downsample,
                 padding=0,
+                bias=True
+            ),
+            nn.SiLU())
+
+
+class STCConnectorV3a(STCConnector):
+
+    def __init__(self, config, downsample=(2, 2, 2), depth=4, mlp_depth=2):
+        super().__init__(config=config, downsample=downsample, depth=depth, mlp_depth=mlp_depth)
+        self.sampler = nn.Sequential(
+            nn.Conv3d(
+                in_channels=self.hidden_size,
+                out_channels=self.hidden_size,
+                kernel_size=downsample,
+                stride=downsample,
+                padding=(1, 0, 0),
                 bias=True
             ),
             nn.SiLU())
