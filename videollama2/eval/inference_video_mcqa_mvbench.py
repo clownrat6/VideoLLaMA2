@@ -17,6 +17,7 @@ import sys
 sys.path.append('./')
 from videollama2 import model_init, x_infer
 from videollama2.constants import NUM_FRAMES
+from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
@@ -141,14 +142,12 @@ class MVBenchDataset(Dataset):
 
     def __getitem__(self, idx):
         decord_method = self.decord_method[self.data_list[idx]['data_type']]
-        bound = None
+        bound = (None, None)
         if self.data_list[idx]['bound']:
-            bound = (
-                self.data_list[idx]['data']['start'],
-                self.data_list[idx]['data']['end'],
-            )
+            bound = (self.data_list[idx]['data']['start'], self.data_list[idx]['data']['end'])
         video_path = os.path.join(self.data_list[idx]['prefix'], self.data_list[idx]['data']['video'])
-        torch_imgs = decord_method(video_path, bound)
+        # torch_imgs = decord_method(video_path, bound)
+        torch_imgs = self.processor(video_path, s=bound[0], e=bound[1])
         question = self.data_list[idx]['data']['question']
         options = self.data_list[idx]['data']['candidates']
         answer = self.data_list[idx]['data']['answer']
@@ -245,6 +244,8 @@ def mvbench_dump(ans_file, line, outputs):
 
 
 def run_inference(args):
+    disable_torch_init()
+
     model, processor, tokenizer, version = model_init(args.model_path)
 
     num_frames = model.config.num_frames if hasattr(model.config, "num_frames") else NUM_FRAMES

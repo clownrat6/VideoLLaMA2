@@ -12,6 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 import sys
 sys.path.append('./')
 from videollama2 import model_init, x_infer
+from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
@@ -99,6 +100,8 @@ def egoschema_dump(ans_file, line, outputs):
 
 
 def run_inference(args):
+    disable_torch_init()
+
     model, processor, tokenizer, version = model_init(args.model_path)
 
     answer_file = os.path.expanduser(args.answer_file)

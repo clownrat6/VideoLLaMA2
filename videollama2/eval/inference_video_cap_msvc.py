@@ -8,6 +8,7 @@ from tqdm import tqdm
 import sys
 sys.path.append('./')
 from videollama2 import model_init, x_infer
+from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
@@ -25,6 +26,8 @@ def get_chunk(lst, n, k):
 
 
 def run_inference(args):
+    disable_torch_init()
+
     model, processor, tokenizer, version = model_init(args.model_path)
 
     gt_questions = json.load(open(args.question_file, "r"))
