@@ -708,7 +708,7 @@ class LazySupervisedDataset(Dataset):
             image_file = os.path.join(self.data_args.data_folder, image_file)
 
             try:
-                image = process_image(image_file, image_processor, self.data_args.image_aspect_ratio)[0]
+                image = process_image(image_file, image_processor, aspect_ratio=self.data_args.image_aspect_ratio)[0]
             except Exception as e:
                 traceback.print_exc()
                 backup_idx = random.randint(0, len(self.list_data_dict)-1)
@@ -722,7 +722,7 @@ class LazySupervisedDataset(Dataset):
             video_file = os.path.join(self.data_args.data_folder, video_file)
 
             try: 
-                video = process_video(video_file, video_processor, self.data_args.image_aspect_ratio, num_frames)
+                video = process_video(video_file, video_processor, aspect_ratio=self.data_args.image_aspect_ratio, num_frames=num_frames)
             except Exception as e:
                 traceback.print_exc()
                 backup_idx = random.randint(0, len(self.list_data_dict)-1)

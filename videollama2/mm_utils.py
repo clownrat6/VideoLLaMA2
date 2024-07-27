@@ -1,10 +1,11 @@
 import ast
+import os
 import math
 import base64
+import traceback
 from io import BytesIO
 
 import torch
-import decord
 import imageio
 import numpy as np
 from PIL import Image
@@ -374,7 +375,96 @@ def process_image(image_path, processor, aspect_ratio='pad', num_frames=NUM_FRAM
     return images
 
 
-def process_video(video_path, processor, aspect_ratio='pad', num_frames=NUM_FRAMES, image_grid=False, sample_scheme='uniform'):
+def frame_sample(duration, mode='uniform', num_frames=None, fps=None):
+    if mode == 'uniform':
+        assert num_frames is not None, "Number of frames must be provided for uniform sampling."
+        # Calculate the size of each segment from which a frame will be extracted
+        seg_size = float(duration) / num_frames
+        return np.arange(seg_size / 2, duration, seg_size).astype(np.int32)
+        # NOTE: old version
+        # return np.linspace(0, duration-1, num_frames, dtype=int)
+    elif mode == 'fps':
+        assert fps is not None, "FPS must be provided for FPS sampling."
+        segment_len = min(fps // NUM_FRAMES_PER_SECOND, duration)
+        return np.arange(segment_len // 2, duration, segment_len, dtype=int)
+    else:
+        raise ImportError(f'Unsupported frame sampling mode: {mode}')
+
+
+def process_video(video_path, processor, s=None, e=None, aspect_ratio='pad', num_frames=NUM_FRAMES):
+    if isinstance(video_path, str):
+        if s is not None and e is not None:
+            s = s if s >= 0. else 0.
+            e = e if e >= 0. else 0.
+            if s > e:
+                s, e = e, s
+            elif s == e:
+                e = s + 1
+
+        # 1. Loading Video
+        if os.path.isdir(video_path):                
+            frame_files = sorted(os.listdir(video_path))
+
+            fps = 3
+            num_frames_of_video = len(frame_files)
+        elif video_path.endswith('.gif'):
+            gif_reader = imageio.get_reader(BytesIO(client.get(video_path)))
+
+            fps = 25
+            num_frames_of_video = len(gif_reader)
+        else:
+            vreader = VideoReader(video_path, ctx=cpu(0), num_threads=1)
+
+            fps = vreader.get_avg_fps()
+            num_frames_of_video = len(vreader)
+
+        # 2. Determine frame range & Calculate frame indices
+        f_start = 0                       if s is None else max(int(s * fps) - 1, 0)
+        f_end   = num_frames_of_video - 1 if e is None else min(int(e * fps) - 1, num_frames_of_video - 1)
+        frame_indices = list(range(f_start, f_end + 1))
+
+        duration = len(frame_indices)
+        # 3. Sampling frame indices 
+        if num_frames is None:
+            sampled_frame_indices = [frame_indices[i] for i in frame_sample(duration, mode='fps', fps=fps)]
+        else:
+            sampled_frame_indices = [frame_indices[i] for i in frame_sample(duration, mode='uniform', num_frames=num_frames)]
+
+        # 4. Acquire frame data
+        if os.path.isdir(video_path): 
+            video_data = [Image.open(os.path.join(video_path, frame_files[f_idx])) for f_idx in sampled_frame_indices]
+        elif video_path.endswith('.gif'):
+            video_data = [Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)) for idx, frame in enumerate(gif_reader) if idx in sampled_frame_indices]
+        else:
+            video_data = [Image.fromarray(frame) for frame in vreader.get_batch(sampled_frame_indices).asnumpy()]
+
+    elif isinstance(video_path, np.ndarray):
+        video_data = [Image.fromarray(f) for f in video_path]
+    elif isinstance(video_path, list) and isinstance(video_path[0], np.ndarray):
+        video_data = [Image.fromarray(f) for f in video_path]
+    elif isinstance(video_path, list) and isinstance(video_path[0], str):
+        video_data = [Image.open(f) for f in video_path]
+    elif isinstance(video_path, list) and isinstance(video_path[0], Image.Image):
+        video_data = video_path
+    else:
+        raise ValueError(f"Unsupported video path type: {type(video_path)}")
+
+    while num_frames is not None and len(video_data) < num_frames:
+        video_data.append(Image.fromarray(np.zeros((*video_data[-1].size, 3), dtype=np.uint8)))
+
+    # MAX_FRAMES filter
+    video_data = video_data[:MAX_FRAMES]
+
+    if aspect_ratio == 'pad':
+        images = [expand2square(f, tuple(int(x*255) for x in processor.image_mean)) for f in video_data]
+        video = processor.preprocess(images, return_tensors='pt')['pixel_values']
+    else:
+        images = [f for f in video_data]
+        video = processor.preprocess(images, return_tensors='pt')['pixel_values']
+    return video
+
+
+def process_video_old(video_path, processor, aspect_ratio='pad', num_frames=NUM_FRAMES, image_grid=False, sample_scheme='uniform'):
     def frame_sample(duration, mode='uniform', local_fps=None):
         if mode == 'uniform':
             # Calculate the size of each segment from which a frame will be extracted
