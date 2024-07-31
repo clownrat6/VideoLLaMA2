@@ -53,6 +53,8 @@ Basic Dependencies:
 * transformers >= 4.41.2 (for mistral tokenizer)
 * tokenizers >= 0.19.1 (for mistral tokenizer)
 
+Add audio
+
 **[Online Mode]** Install required packages (better for development):
 ```bash
 git clone https://github.com/DAMO-NLP-SG/VideoLLaMA2
