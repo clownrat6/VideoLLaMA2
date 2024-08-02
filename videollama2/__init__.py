@@ -1,13 +1,15 @@
+import os
 import copy
+import warnings
+import shutil
 from functools import partial
 
 import torch
 
-from .model import Videollama2LlamaForCausalLM, Videollama2MistralForCausalLM, Videollama2MixtralForCausalLM, Videollama2Qwen2ForCausalLM
-from .model.builder import load_pretrained_model
-from .conversation import conv_templates, SeparatorStyle
-from .mm_utils import process_video, tokenizer_MMODAL_token, get_model_name_from_path, KeywordsStoppingCriteria
-from .constants import NUM_FRAMES, DEFAULT_MMODAL_TOKEN, MMODAL_TOKEN_INDEX
+from .model import load_pretrained_model
+from .mm_utils import process_image, process_video, tokenizer_multimodal_token, get_model_name_from_path, KeywordsStoppingCriteria
+from .constants import NUM_FRAMES, DEFAULT_IMAGE_TOKEN, DEFAULT_VIDEO_TOKEN, MODAL_INDEX_MAP
+
 
 
 def model_init(model_path=None):
@@ -20,20 +22,10 @@ def model_init(model_path=None):
 
     num_frames = model.config.num_frames if hasattr(model.config, "num_frames") else NUM_FRAMES
 
-    if 'vicuna' in model_name.lower():
-        # vicuna
-        version = 'v1'
-    elif 'qwen' in model_name.lower():
-        # qwen1.5/qwen2
-        version = 'qwen'
-    else:
-        # mistral/mixtral/llama2
-        version = 'llama2'
-
-    return model, partial(process_video, aspect_ratio=None, processor=processor, num_frames=num_frames), tokenizer, version
+    return model, partial(process_video, aspect_ratio=None, processor=processor, num_frames=num_frames), tokenizer
 
 
-def infer(model, video, instruct, tokenizer, do_sample=False, version='llama2'):
+def infer(model, video, instruct, tokenizer, do_sample=False):
     """inference api of VideoLLaMA2 for video understanding.
 
     Args:
@@ -47,35 +39,30 @@ def infer(model, video, instruct, tokenizer, do_sample=False, version='llama2'):
         str: response of the model.
     """
 
-    # 1. vision preprocess (load & transform image or video).
-    tensor = [video.half().cuda()]
-    modals = ["video"]
-
-    # 2. text preprocess (tag process & generate prompt).
-    modal_token = DEFAULT_MMODAL_TOKEN['VIDEO']
-    modal_index = MMODAL_TOKEN_INDEX["VIDEO"]
+    # 1. text preprocess (tag process & generate prompt).
+    modal_token = DEFAULT_VIDEO_TOKEN
     instruct = modal_token + '\n' + instruct
 
-    conv = conv_templates[version].copy()
-    conv.append_message(conv.roles[0], instruct)
-    conv.append_message(conv.roles[1], None)
-    prompt = conv.get_prompt()
+    # 2. vision preprocess (load & transform image or video).
+    tensor = video.half().cuda()
 
-    input_ids = tokenizer_MMODAL_token(prompt, tokenizer, modal_index, return_tensors='pt').unsqueeze(0).cuda()
+    message = [{'role': 'user', 'content': instruct}]
+    prompt = tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=True)
+
+    input_ids = tokenizer_multimodal_token(prompt, tokenizer, modal_token, return_tensors='pt').unsqueeze(0).long().cuda()
     attention_masks = input_ids.ne(tokenizer.pad_token_id).long().cuda()
 
+    tensor = [(tensor, modal_token)]
+
     # 3. generate response according to visual signals and prompts. 
-    stop_str = conv.sep if conv.sep_style in [SeparatorStyle.SINGLE, SeparatorStyle.QWEN] else conv.sep2
-    # keywords = ["<s>", "</s>"]
-    keywords = [stop_str]
+    keywords = [tokenizer.eos_token]
     stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
 
     with torch.inference_mode():
         output_ids = model.generate(
             input_ids,
             attention_mask=attention_masks,
-            images_or_videos=tensor,
-            modal_list=modals,
+            images=tensor,
             do_sample=do_sample,
             temperature=0.2 if do_sample else 0.0,
             max_new_tokens=1024,
@@ -89,13 +76,13 @@ def infer(model, video, instruct, tokenizer, do_sample=False, version='llama2'):
     return outputs
 
 
-def x_infer(video, question, model, tokenizer, mode='vanilla', do_sample=False, version='llama2'):
+def x_infer(video, question, model, tokenizer, mode='vanilla', do_sample=False):
     if mode == 'mcqa':
         instruction = f'{question}\nAnswer with the option\'s letter from the given choices directly and only give the best option.'
-        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample, version=version)
+        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample)
     elif mode == 'openend':
         instruction = f'{question}\nAnswer the question using a single word or a short phrase with multiple words.'
-        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample, version=version)
+        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample)
     elif mode == 'vanilla':
         instruction = question
-        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample, version=version)
+        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample)
