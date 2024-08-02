@@ -12,6 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 import sys
 sys.path.append('./')
 from videollama2 import model_init, x_infer
+from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
 warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is deprecated')
@@ -30,7 +31,7 @@ def get_chunk(lst, n, k):
 
 class VCGPTDataset(Dataset):
 
-    video_formats = ['.mp4', '.avi', '.mov', '.mkv']
+    video_formats = ['.mp4', '.webm', '.avi', '.mov', '.mkv']
 
     def __init__(self, data_list, processor):
         self.data_list = data_list
@@ -71,6 +72,8 @@ def collate_fn(batch):
 
 
 def run_inference(args):
+    disable_torch_init()
+
     # Initialize the model
     model, processor, tokenizer, version = model_init(args.model_path)
 

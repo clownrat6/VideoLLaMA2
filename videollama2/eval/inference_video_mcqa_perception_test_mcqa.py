@@ -13,6 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 import sys
 sys.path.append('./')
 from videollama2 import model_init, x_infer
+from videollama2.utils import disable_torch_init
 
 
 def split_list(lst, n):
@@ -83,6 +84,8 @@ def collate_fn(batch):
 
 
 def run_inference(args):
+    disable_torch_init()
+
     model, processor, tokenizer, version = model_init(args.model_path)
 
     questions = json.load(open(args.question_file, "r"))
