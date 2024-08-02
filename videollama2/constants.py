@@ -1,26 +1,27 @@
 CONTROLLER_HEART_BEAT_EXPIRATION = 30
 WORKER_HEART_BEAT_INTERVAL = 15
 
-LOGDIR = "./log_dir"
-
-NUM_FRAMES = 8
-MAX_FRAMES = 32
-NUM_FRAMES_PER_SECOND = 1
+LOGDIR = "."
 
 # Model Constants
 IGNORE_INDEX = -100
+
+# Image arguments
 IMAGE_TOKEN_INDEX = -200
 DEFAULT_IMAGE_TOKEN = "<image>"
-DEFAULT_VIDEO_TOKEN = "<video>"
-DEFAULT_AUDIO_TOKEN = "<audio>"
 DEFAULT_IMAGE_PATCH_TOKEN = "<im_patch>"
 DEFAULT_IM_START_TOKEN = "<im_start>"
 DEFAULT_IM_END_TOKEN = "<im_end>"
 IMAGE_PLACEHOLDER = "<image-placeholder>"
 
+# Video arguments
+VIDEO_TOKEN_INDEX = -201
+DEFAULT_VIDEO_TOKEN = "<video>"
+NUM_FRAMES = 8
+MAX_FRAMES = 32
+NUM_FRAMES_PER_SECOND = 1
 
-MMODAL_TOKEN_INDEX = {"IMAGE": -200, "VIDEO": -201, "AUDIO": -202}
-MMODAL_INDEX_TOKEN = {v: k for k, v in MMODAL_TOKEN_INDEX.items()}
-
-
-DEFAULT_MMODAL_TOKEN = {"IMAGE": "<image>", "VIDEO": "<video>", "AUDIO": "<audio>"}
+MODAL_INDEX_MAP = {
+    "<image>": -200,
+    "<video>": -201,
+}
