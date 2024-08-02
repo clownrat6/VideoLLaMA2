@@ -43,7 +43,7 @@ from transformers.models.mixtral.modeling_mixtral import MixtralSparseMoeBlock
 sys.path.append('./')
 from videollama2 import conversation as conversation_lib
 from videollama2.model import *
-from videollama2.constants import NUM_FRAMES, IGNORE_INDEX, MMODAL_TOKEN_INDEX, DEFAULT_MMODAL_TOKEN, DEFAULT_MMODAL_START_TOKEN, DEFAULT_MMODAL_END_TOKEN
+from videollama2.constants import NUM_FRAMES, IGNORE_INDEX, MMODAL_TOKEN_INDEX, DEFAULT_MMODAL_TOKEN
 from videollama2.mm_utils import tokenizer_MMODAL_token, tokenizer_image_token, expand2square, process_video, process_image
 from videollama2.videollama2_trainer import (
     VideoLLaMA2Trainer,
@@ -91,8 +91,6 @@ class ModelArguments:
     mm_vision_select_layer: Optional[int] = field(default=-1)
     mm_vision_select_feature: Optional[str] = field(default="patch")
     # Other Arguments
-    mm_use_im_start_end: bool = field(default=False)
-    mm_use_im_patch_token: bool = field(default=True)
     pretrain_model_name_or_path: Optional[str] = field(default=None, metadata={"help": "To train from previously trained checkpoints. E.g, further fine-tuning based on the finetuned version of the whole model."})
 
 
@@ -264,8 +262,6 @@ def preprocess_multimodal(sources: Sequence[str], data_args: DataArguments) -> D
                     if "mmtag" in conversation_lib.default_conversation.version:
                         sentence['value'] = sentence['value'].replace(DEFAULT_TOKEN, f'<{MODAL_TYPE.capitalize()}>' + DEFAULT_TOKEN + f'</{MODAL_TYPE.capitalize()}>')
                 replace_token = DEFAULT_TOKEN
-                if data_args.mm_use_im_start_end and MODAL_TYPE is not None:
-                    replace_token = DEFAULT_MMODAL_START_TOKEN[MODAL_TYPE.upper()] + replace_token + DEFAULT_MMODAL_START_TOKEN[MODAL_TYPE.upper()]
                 sentence["value"] = sentence["value"].replace(DEFAULT_TOKEN, replace_token)
 
     return sources
@@ -708,7 +704,7 @@ class LazySupervisedDataset(Dataset):
             image_file = os.path.join(self.data_args.data_folder, image_file)
 
             try:
-                image = process_image(image_file, image_processor, self.data_args.image_aspect_ratio)[0]
+                image = process_image(image_file, image_processor, aspect_ratio=self.data_args.image_aspect_ratio)[0]
             except Exception as e:
                 traceback.print_exc()
                 backup_idx = random.randint(0, len(self.list_data_dict)-1)
@@ -722,7 +718,7 @@ class LazySupervisedDataset(Dataset):
             video_file = os.path.join(self.data_args.data_folder, video_file)
 
             try: 
-                video = process_video(video_file, video_processor, self.data_args.image_aspect_ratio, num_frames)
+                video = process_video(video_file, video_processor, aspect_ratio=self.data_args.image_aspect_ratio, num_frames=num_frames)
             except Exception as e:
                 traceback.print_exc()
                 backup_idx = random.randint(0, len(self.list_data_dict)-1)
@@ -1001,12 +997,7 @@ def train(attn_implementation=None):
         if training_args.bits in [4, 8]:
             model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
 
-        model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_projector_lr = training_args.mm_projector_lr
-        training_args.use_im_start_end = model_args.mm_use_im_start_end
-        model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
-        model.initialize_MM_tokenizer(model_args, tokenizer=tokenizer)
-
         model.config.num_frames = NUM_FRAMES if data_args.num_frames is None else data_args.num_frames
 
     if training_args.bits in [4, 8]:

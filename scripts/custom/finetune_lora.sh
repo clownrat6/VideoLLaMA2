@@ -49,8 +49,6 @@ torchrun --nnodes $WORLD_SIZE \
     --data_folder ${DATA_DIR}/videollava_sft/ \
     --pretrain_mm_mlp_adapter DAMO-NLP-SG/VideoLLaMA2-7B-Base/mm_projector.bin \
     --mm_vision_select_layer -2 \
-    --mm_use_im_start_end False \
-    --mm_use_im_patch_token False \
     --image_aspect_ratio pad \
     --num_frames 8 \
     --bf16 True \

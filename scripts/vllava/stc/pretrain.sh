@@ -48,8 +48,6 @@ torchrun --nnodes $WORLD_SIZE \
     --data_path   ${DATA_DIR}/videollava_pt/valley_llavaimage.json \
     --data_folder ${DATA_DIR}/videollava_pt/ \
     --mm_vision_select_layer -2 \
-    --mm_use_im_start_end False \
-    --mm_use_im_patch_token False \
     --num_frames 8 \
     --bf16 True \
     --tf32 True \
