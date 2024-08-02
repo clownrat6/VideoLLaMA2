@@ -20,11 +20,9 @@ import einops
 import torch
 import torch.nn as nn
 
-from .multimodal_projector import load_mm_projector
-from .multimodal_encoder.builder import build_vision_tower
-from .multimodal_projector.builder import build_vision_projector
-from ..mm_utils import get_anyres_image_grid_shape
-from ..constants import NUM_FRAMES, IGNORE_INDEX, MMODAL_TOKEN_INDEX
+from .projector import load_mm_projector, build_vision_projector
+from .encoder import build_vision_tower
+from ..constants import IGNORE_INDEX, NUM_FRAMES, MODAL_INDEX_MAP
 
 
 class Videollama2MetaModel:
@@ -114,16 +112,23 @@ class Videollama2MetaForCausalLM(ABC):
     def get_vision_tower(self):
         return self.get_model().get_vision_tower()
 
-    def encode_images_or_videos(self, images_or_videos, modalities):
+    def encode_images_or_videos(self, images):
         num_frames = self.config.num_frames if hasattr(self.config, 'num_frames') else NUM_FRAMES
+        
+        data_batch = []
+        for i, (data, modal) in enumerate(images):
+            if modal == 'image':
+                data = data.expand(num_frames, -1, -1, -1)
+            else:
+                data = data
+            data_batch.append(data)
 
-        videos = [x.unsqueeze(0).expand(num_frames, -1, -1, -1) if modal == 'image' else x for x, modal in zip(images_or_videos, modalities)]
-        videos = torch.stack(videos, dim=0)
+        data_batch = torch.stack(data_batch, dim=0)
 
-        assert len(videos.size()) == 5
-        batch_size = videos.size(0)
+        assert len(data_batch.size()) == 5
+        batch_size = data_batch.size(0)
 
-        frames = einops.rearrange(videos, 'b t c h w -> (b t) c h w')
+        frames = einops.rearrange(data_batch, 'b t c h w -> (b t) c h w')
         frames_features = self.get_model().get_vision_tower()(frames)
         frames_features = einops.rearrange(frames_features, '(b t) n h -> b t n h', b = batch_size)
 
@@ -155,58 +160,57 @@ class Videollama2MetaForCausalLM(ABC):
         return video_features
 
     def prepare_inputs_labels_for_multimodal(
-        self, input_ids, attention_mask, past_key_values, labels, X_modalities
+        self, input_ids, attention_mask, past_key_values, labels, images
     ):
         vision_tower = self.get_vision_tower()
         # NOTE: text-only situation
-        if vision_tower is None or X_modalities is None or input_ids.shape[1] == 1:
+        if vision_tower is None or images is None or input_ids.shape[1] == 1:
             # if past_key_values is not None and vision_tower is not None and Xs is not None and input_ids.shape[1] == 1:
             #    attention_mask = torch.ones((attention_mask.shape[0], past_key_values[-1][-1].shape[-2] + 1), dtype=attention_mask.dtype, device=attention_mask.device)
             return input_ids, attention_mask, past_key_values, None, labels
 
-        Xs, keys = X_modalities
-        X_features = self.encode_images_or_videos(Xs, keys)
+        mm_features = self.encode_images_or_videos(images)
 
         new_input_embeds = []
         new_labels = [] if labels is not None else None
-        cur_X_idx = 0
+        cur_mm_idx = 0
         # replace image/video/audio tokens with pre-computed embeddings
         for batch_idx, cur_input_ids in enumerate(input_ids):
-            # cur_X_features = X_features[batch_idx]
-            if (torch.any(torch.stack([cur_input_ids == MMODAL_TOKEN_INDEX[key.upper()] for key in keys]), dim=0)).sum() == 0:
+            num_multimodals = sum((cur_input_ids == mm_token_idx).sum() for mm_token_idx in MODAL_INDEX_MAP.values())
+            # pure text input
+            if num_multimodals == 0:
                 half_len = cur_input_ids.shape[0] // 2
-                cur_X_features = X_features[cur_X_idx]
+                cur_mm_features = mm_features[cur_mm_idx]
                 cur_input_embeds_1 = self.get_model().embed_tokens(cur_input_ids[:half_len])
                 cur_input_embeds_2 = self.get_model().embed_tokens(cur_input_ids[half_len:])
-                cur_input_embeds = torch.cat([cur_input_embeds_1, cur_X_features[0:0], cur_input_embeds_2], dim=0)
+                cur_input_embeds = torch.cat([cur_input_embeds_1, cur_mm_features[0:0], cur_input_embeds_2], dim=0)
                 new_input_embeds.append(cur_input_embeds)
                 if labels is not None:
                     new_labels.append(labels[batch_idx])
-                cur_X_idx += 1 
+                cur_mm_idx += 1 
                 continue
 
-            X_token_indices = torch.where(torch.any(torch.stack([cur_input_ids == MMODAL_TOKEN_INDEX[key.upper()] for key in keys]), dim=0))[0] 
             cur_new_input_embeds = []
             if labels is not None:
                 cur_labels = labels[batch_idx]
                 cur_new_labels = []
                 assert cur_labels.shape == cur_input_ids.shape
-            
-            # X_index_inonesample = 0
-            while X_token_indices.numel() > 0:
-                cur_X_features = X_features[cur_X_idx]
-                X_token_start = X_token_indices[0]
 
-                cur_new_input_embeds.append(self.get_model().embed_tokens(cur_input_ids[:X_token_start])) 
-                cur_new_input_embeds.append(cur_X_features)
+            mm_token_indices = torch.where(sum([cur_input_ids == mm_token_idx for mm_token_idx in MODAL_INDEX_MAP.values()]))[0]
+            while mm_token_indices.numel() > 0:
+                cur_mm_features = mm_features[cur_mm_idx]
+                mm_token_start = mm_token_indices[0]
+
+                cur_new_input_embeds.append(self.get_model().embed_tokens(cur_input_ids[:mm_token_start])) 
+                cur_new_input_embeds.append(cur_mm_features)
                 if labels is not None:
-                    cur_new_labels.append(cur_labels[:X_token_start])
-                    cur_new_labels.append(torch.full((cur_X_features.shape[0],), IGNORE_INDEX, device=labels.device, dtype=labels.dtype))
-                    cur_labels = cur_labels[X_token_start+1:]
+                    cur_new_labels.append(cur_labels[:mm_token_start])
+                    cur_new_labels.append(torch.full((cur_mm_features.shape[0],), IGNORE_INDEX, device=labels.device, dtype=labels.dtype))
+                    cur_labels = cur_labels[mm_token_start+1:]
 
-                cur_X_idx += 1
-                cur_input_ids = cur_input_ids[X_token_start+1:] 
-                X_token_indices = torch.where(torch.any(torch.stack([cur_input_ids == MMODAL_TOKEN_INDEX[key.upper()] for key in keys]), dim=0))[0]
+                cur_mm_idx += 1
+                cur_input_ids = cur_input_ids[mm_token_start+1:] 
+                mm_token_indices = torch.where(sum([cur_input_ids == mm_token_idx for mm_token_idx in MODAL_INDEX_MAP.values()]))[0]
 
             if cur_input_ids.numel() > 0:
                 cur_new_input_embeds.append(self.get_model().embed_tokens(cur_input_ids))
