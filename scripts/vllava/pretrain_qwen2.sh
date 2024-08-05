@@ -28,8 +28,8 @@ GRADIENT_ACCUMULATION_STEPS=$[$GLOBAL_BATCH_SIZE/($WORLD_SIZE*$NPROC_PER_NODE*$L
 
 # Log Arguments
 export TRANSFORMERS_OFFLINE=1
-export WANDB_PROJECT=videollama2_vllava
-RUN_NAME=videollama2_stp_vllava
+export WANDB_PROJECT=videollama2qwen2
+RUN_NAME=vllava_settings
 DATA_DIR=datasets
 OUTP_DIR=work_dirs
 
@@ -40,11 +40,11 @@ torchrun --nnodes $WORLD_SIZE \
     --node_rank $RANK \
     videollama2/train_flash_attn.py \
     --deepspeed scripts/zero3.json \
-    --version plain \
+    --model_type videollama2_qwen2 \
+    --model_path Qwen/Qwen2-7B-Instruct \
     --vision_tower openai/clip-vit-large-patch14-336 \
-    --mm_projector_type stp_connector \
+    --mm_projector_type stc_connector \
     --tune_mm_mlp_adapter True \
-    --model_name_or_path mistralai/Mistral-7B-Instruct-v0.2 \
     --data_path   ${DATA_DIR}/videollava_pt/valley_llavaimage.json \
     --data_folder ${DATA_DIR}/videollava_pt/ \
     --mm_vision_select_layer -2 \
