@@ -26,6 +26,17 @@ from .videollama2_llama import Videollama2LlamaForCausalLM, Videollama2Config
 from .videollama2_mistral import Videollama2MistralForCausalLM, Videollama2MistralConfig
 from .videollama2_mixtral import Videollama2MixtralForCausalLM, Videollama2MixtralConfig
 from .videollama2_qwen2 import Videollama2Qwen2ForCausalLM, Videollama2Qwen2Config
+from .videollama2_gemma2 import Videollama2Gemma2ForCausalLM, Videollama2Gemma2Config
+
+
+VLLMs = {
+    "videollama2": Videollama2MistralForCausalLM,
+    "videollama2_llama": Videollama2LlamaForCausalLM,
+    "videollama2_mistral": Videollama2MistralForCausalLM,
+    "videollama2_mixtral": Videollama2MixtralForCausalLM,
+    "videollama2_qwen2": Videollama2Qwen2ForCausalLM,
+    "videollama2_gemma2": Videollama2Gemma2ForCausalLM,
+}
 
 
 def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, load_4bit=False, device_map="auto", device="cuda", use_flash_attn=False, **kwargs):

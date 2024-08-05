@@ -70,7 +70,8 @@ def set_seed(seed=42):
 @dataclass
 class ModelArguments:
     # LLM Arguments
-    model_name_or_path: Optional[str] = field(default="lmsys/vicuna-7b-v1.5")
+    model_type: Optional[str] = field(default="videollama2", metadata={"help": "Model type selected in the list: " + ", ".join(VLLMs.keys())})
+    model_path: Optional[str] = field(default="lmsys/vicuna-7b-v1.5")
     version: Optional[str] = field(default="v1", metadata={"help": "Version of the conversation template."})
     freeze_backbone: bool = field(default=False, metadata={"help": "Whether to freeze the LLM backbone."})
     # Connector Arguments
@@ -81,8 +82,6 @@ class ModelArguments:
     vision_tower: Optional[str] = field(default=None)
     mm_vision_select_layer: Optional[int] = field(default=-1)
     mm_vision_select_feature: Optional[str] = field(default="patch")
-    # Other Arguments
-    pretrain_model_name_or_path: Optional[str] = field(default=None, metadata={"help": "To train from previously trained checkpoints. E.g, further fine-tuning based on the finetuned version of the whole model."})
 
 
 @dataclass
@@ -162,6 +161,15 @@ def preprocess_plain(
         instruction = tokenizer.apply_chat_template(message[:1], tokenize=False, add_generation_prompt=True)
         instruction_len = len(tokenizer_multimodal_token(instruction, tokenizer, modal_token, return_tensors='pt'))
         targets[-1][:instruction_len] = IGNORE_INDEX
+
+        # print("instruction: ----------------")
+        # print(instruction)
+        # print("conversation: ----------------")
+        # print(conversation)
+        # print("training targets: ----------------")
+        # print(tokenizer.decode(targets[-1][instruction_len:]))
+        # print(input_ids[-1])
+        # print(targets[-1])
 
     return dict(input_ids=input_ids, labels=targets)
 
@@ -421,74 +429,28 @@ def train(attn_implementation=None):
                 bnb_4bit_quant_storage=compute_dtype,
             )
         ))
-    if model_args.pretrain_model_name_or_path is not None:
-        assert os.path.exists(model_args.pretrain_model_name_or_path)
-        pretrain_model_name_or_path = model_args.pretrain_model_name_or_path
+    
+    config = transformers.AutoConfig.from_pretrained(model_args.model_path, trust_remote_code=True)
+    if 'gemma2' in model_args.model_type:
+        config._attn_implementation = 'eager'
     else:
-        pretrain_model_name_or_path = model_args.model_name_or_path
+        config._attn_implementation = attn_implementation
+
     if model_args.vision_tower is not None:
-        if 'vicuna' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
-            config._attn_implementation = attn_implementation
-            model = Videollama2LlamaForCausalLM.from_pretrained(
-                pretrain_model_name_or_path,
-                config=config,
-                cache_dir=training_args.cache_dir,
-                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-                do_sample=True,
-                **bnb_model_from_pretrained_args
-            )
-        elif 'mistral' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
-            config._attn_implementation = attn_implementation
-            model = Videollama2MistralForCausalLM.from_pretrained(
-                pretrain_model_name_or_path,
-                config=config,
-                cache_dir=training_args.cache_dir,
-                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-                do_sample=True,
-                **bnb_model_from_pretrained_args
-            )
-        elif 'mixtral' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
-            config._attn_implementation = attn_implementation
-            model = Videollama2MixtralForCausalLM.from_pretrained(
-                pretrain_model_name_or_path,
-                config=config,
-                cache_dir=training_args.cache_dir,
-                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-                do_sample=True,
-                **bnb_model_from_pretrained_args
-            )
+        model = VLLMs[model_args.model_type].from_pretrained(
+            model_args.model_path,
+            config=config,
+            cache_dir=training_args.cache_dir,
+            torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+            do_sample=True,
+            **bnb_model_from_pretrained_args
+        )
+        if 'mixtral' in model_args.model_type:
             import deepspeed
             deepspeed.utils.set_z3_leaf_modules(model, [MixtralSparseMoeBlock])
-        elif 'qwen2' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
-            config._attn_implementation = attn_implementation
-            model = Videollama2Qwen2ForCausalLM.from_pretrained(
-                pretrain_model_name_or_path,
-                config=config,
-                cache_dir=training_args.cache_dir,
-                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-                do_sample=True,
-                **bnb_model_from_pretrained_args
-            )
-        else:
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
-            config._attn_implementation = attn_implementation
-            model = Videollama2MistralForCausalLM.from_pretrained(
-                pretrain_model_name_or_path,
-                config=config,
-                cache_dir=training_args.cache_dir,
-                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-                do_sample=True,
-                **bnb_model_from_pretrained_args
-            )
     else:
-        config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
-        config._attn_implementation = attn_implementation
         model = transformers.LlamaForCausalLM.from_pretrained(
-            pretrain_model_name_or_path,
+            model_args.model_path,
             config=config,
             cache_dir=training_args.cache_dir,
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
@@ -533,14 +495,14 @@ def train(attn_implementation=None):
 
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
-        model_args.model_name_or_path,
+        model_args.model_path,
         cache_dir=training_args.cache_dir,
         model_max_length=training_args.model_max_length,
         padding_side="right",
         use_fast=True,
     )
 
-    if tokenizer.unk_token is not None: 
+    if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.unk_token
 
     if model_args.vision_tower is not None:

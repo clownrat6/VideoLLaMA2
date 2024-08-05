@@ -198,6 +198,8 @@ def videomme_dump(record, instruct, options, output):
         '0': 'zero',
     }
 
+    output = output.replace('answer', '')
+    output = output.replace('Answer', '')
     pred_answer = re.findall('[\(\ \[]*([A-D])[\)\.\ \]]*', output)
     try:
         find_flag = False
@@ -229,7 +231,7 @@ def run_inference(args):
     disable_torch_init()
 
     # Initialize the model
-    model, processor, tokenizer, version = model_init(args.model_path)
+    model, processor, tokenizer = model_init(args.model_path)
 
     answer_file = os.path.expanduser(args.answer_file)
     answer_sub_file = answer_file.replace('.json', '_sub.json')
@@ -270,11 +272,11 @@ def run_inference(args):
                 instruct += f"{cho}\n"
             # instruct += "The best option is: "
             instruct += "Answer with the option\'s letter from the given choices directly and only give the best option. The best answer is: "
-            output = x_infer(video_tensor, instruct, mode='vanilla', model=model, tokenizer=tokenizer, do_sample=False, version=version)
+            output = x_infer(video_tensor, instruct, mode='vanilla', model=model, tokenizer=tokenizer, do_sample=False)
             new_record['questions'][idx]['response'] = videomme_dump(record, instruct, options, output)
 
             instruct = f"This video's subtitles are listed below:\n{subtitle}\n" + instruct
-            output = x_infer(video_tensor, instruct, mode='vanilla', model=model, tokenizer=tokenizer, do_sample=False, version=version)
+            output = x_infer(video_tensor, instruct, mode='vanilla', model=model, tokenizer=tokenizer, do_sample=False)
             new_record_sub['questions'][idx]['response'] = videomme_dump(record, instruct, options, output)
 
         ans_file.write(json.dumps(new_record) + ",\n")

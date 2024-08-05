@@ -86,6 +86,8 @@ def egoschema_dump(ans_file, line, outputs):
         instruct = line['instruct'][idx]
         letters = ['A', 'B', 'C', 'D', 'E']
 
+        output = output.replace('answer', '')
+        output = output.replace('Answer', '')
         pred_answer = re.findall('[\(\ ]*[A-E][\)\ ]*', output)
         try:
             assert len(pred_answer) >= 1, 'The video \"{}\" output \"{}\" is not in the expected format'.format(line['q_uid'], instruct + '\n' + output)
@@ -102,7 +104,7 @@ def egoschema_dump(ans_file, line, outputs):
 def run_inference(args):
     disable_torch_init()
 
-    model, processor, tokenizer, version = model_init(args.model_path)
+    model, processor, tokenizer = model_init(args.model_path)
 
     answer_file = os.path.expanduser(args.answer_file)
     os.makedirs(os.path.dirname(answer_file), exist_ok=True)
@@ -122,7 +124,6 @@ def run_inference(args):
             model=model,
             tokenizer=tokenizer,
             do_sample=False,
-            version=version,
         )
 
         egoschema_dump(ans_file, line, [pred])

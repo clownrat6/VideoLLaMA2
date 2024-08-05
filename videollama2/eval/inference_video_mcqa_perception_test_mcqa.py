@@ -86,7 +86,7 @@ def collate_fn(batch):
 def run_inference(args):
     disable_torch_init()
 
-    model, processor, tokenizer, version = model_init(args.model_path)
+    model, processor, tokenizer = model_init(args.model_path)
 
     questions = json.load(open(args.question_file, "r"))
     questions = list(questions.values())
@@ -122,10 +122,11 @@ def run_inference(args):
                 mode='vanilla',
                 model=model,
                 tokenizer=tokenizer,
-                do_sample=False,
-                version=version,
+                do_sample=False
             )
 
+            output = output.replace('answer', '')
+            output = output.replace('Answer', '')
             pred_answer = re.findall('\(*[A-C]\)*', output)
             try:
                 assert len(pred_answer) >= 1, 'The video \"{}\" output \"{}\" is not in the expected format'.format(video_id, instruct + '\n' + output)
