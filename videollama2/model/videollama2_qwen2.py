@@ -30,6 +30,10 @@ from .videollama2_arch import Videollama2MetaModel, Videollama2MetaForCausalLM
 class Videollama2Qwen2Config(Qwen2Config):
     model_type = "videollama2_qwen2"
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model_type = "videollama2_mixtral"
+
 
 class Videollama2Qwen2Model(Videollama2MetaModel, Qwen2Model):
     config_class = Videollama2Qwen2Config

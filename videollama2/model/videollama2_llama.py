@@ -30,6 +30,10 @@ from .videollama2_arch import Videollama2MetaModel, Videollama2MetaForCausalLM
 class Videollama2Config(LlamaConfig):
     model_type = "videollama2_llama"
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model_type = "videollama2_llama"
+
 
 class Videollama2LlamaModel(Videollama2MetaModel, LlamaModel):
     config_class = Videollama2Config

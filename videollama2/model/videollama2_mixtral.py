@@ -31,6 +31,10 @@ from .videollama2_arch import Videollama2MetaModel, Videollama2MetaForCausalLM
 class Videollama2MixtralConfig(MixtralConfig):
     model_type = "videollama2_mixtral"
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model_type = "videollama2_mixtral"
+
 
 class Videollama2MixtralModel(Videollama2MetaModel, MixtralModel):
     config_class = Videollama2MixtralConfig

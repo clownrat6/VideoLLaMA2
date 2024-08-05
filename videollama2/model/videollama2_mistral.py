@@ -20,7 +20,7 @@ import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 
-from transformers import AutoConfig, AutoModelForCausalLM, \
+from transformers import AutoConfig, AutoModelForCausalLM, PretrainedConfig, \
                          MistralConfig, MistralModel, MistralForCausalLM
 
 from transformers.modeling_outputs import CausalLMOutputWithPast
@@ -31,6 +31,10 @@ from .videollama2_arch import Videollama2MetaModel, Videollama2MetaForCausalLM
 
 class Videollama2MistralConfig(MistralConfig):
     model_type = "videollama2_mistral"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model_type = "videollama2_mistral"
 
 
 class Videollama2MistralModel(Videollama2MetaModel, MistralModel):
