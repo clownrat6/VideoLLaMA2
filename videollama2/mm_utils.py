@@ -106,10 +106,20 @@ def process_image(image_path, processor, aspect_ratio='pad'):
 def frame_sample(duration, mode='uniform', num_frames=None, fps=None):
     if mode == 'uniform':
         assert num_frames is not None, "Number of frames must be provided for uniform sampling."
+        # NOTE: v1 version
         # Calculate the size of each segment from which a frame will be extracted
-        seg_size = float(duration) / num_frames
-        return np.arange(seg_size / 2, duration, seg_size).astype(np.int32)
-        # NOTE: old version
+        seg_size = float(duration - 1) / num_frames
+
+        frame_ids = []
+        for i in range(num_frames):
+            # Calculate the start and end indices of each segment
+            start = seg_size * i
+            end   = seg_size * (i + 1)
+            # Append the middle index of the segment to the list
+            frame_ids.append((start + end) / 2)
+
+        return np.round(np.array(frame_ids) + 1e-6).astype(int)
+        # NOTE: v0 version
         # return np.linspace(0, duration-1, num_frames, dtype=int)
     elif mode == 'fps':
         assert fps is not None, "FPS must be provided for FPS sampling."
@@ -136,7 +146,7 @@ def process_video(video_path, processor, s=None, e=None, aspect_ratio='pad', num
             fps = 3
             num_frames_of_video = len(frame_files)
         elif video_path.endswith('.gif'):
-            gif_reader = imageio.get_reader(BytesIO(client.get(video_path)))
+            gif_reader = imageio.get_reader(video_path)
 
             fps = 25
             num_frames_of_video = len(gif_reader)
@@ -162,7 +172,7 @@ def process_video(video_path, processor, s=None, e=None, aspect_ratio='pad', num
         if os.path.isdir(video_path): 
             video_data = [Image.open(os.path.join(video_path, frame_files[f_idx])) for f_idx in sampled_frame_indices]
         elif video_path.endswith('.gif'):
-            video_data = [Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)) for idx, frame in enumerate(gif_reader) if idx in sampled_frame_indices]
+            video_data = [Image.fromarray(frame) for idx, frame in enumerate(gif_reader) if idx in sampled_frame_indices]
         else:
             video_data = [Image.fromarray(frame) for frame in vreader.get_batch(sampled_frame_indices).asnumpy()]
 

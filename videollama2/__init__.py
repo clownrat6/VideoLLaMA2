@@ -11,7 +11,6 @@ from .mm_utils import process_image, process_video, tokenizer_multimodal_token, 
 from .constants import NUM_FRAMES, DEFAULT_IMAGE_TOKEN, DEFAULT_VIDEO_TOKEN, MODAL_INDEX_MAP
 
 
-
 def model_init(model_path=None):
     model_path = "DAMO-NLP-SG/VideoLLaMA2-7B" if model_path is None else model_path
     model_name = get_model_name_from_path(model_path)
@@ -46,7 +45,18 @@ def infer(model, video, instruct, tokenizer, do_sample=False):
     # 2. vision preprocess (load & transform image or video).
     tensor = video.half().cuda()
 
-    message = [{'role': 'user', 'content': instruct}]
+    if model.config.model_type in ['videollama2', 'videollama2_mistral', 'videollama2_mixtral']:
+        system_message = [
+            {'role': 'system', 'content': (
+            """<<SYS>>\nYou are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature."""
+            """\n"""
+            """If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.\n<</SYS>>""")
+            }
+        ]
+    else:
+        system_message = []
+
+    message = system_message + [{'role': 'user', 'content': instruct}]
     prompt = tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=True)
 
     input_ids = tokenizer_multimodal_token(prompt, tokenizer, modal_token, return_tensors='pt').unsqueeze(0).long().cuda()
