@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import sys
 sys.path.append('./')
-from videollama2 import model_init, x_infer
+from videollama2 import model_init, mm_infer
 from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
@@ -109,13 +109,13 @@ def run_inference(args):
 
         # question = question + '\n' + 'Answer the question using a single word or a short phrase with multiple words.'
 
-        output = x_infer(
+        output = mm_infer(
             video_tensor,
             question,
             model=model,
             tokenizer=tokenizer,
-            do_sample=False,
             modal='video',
+            do_sample=False,
         )
 
         sample_set = {'id': question_id, 'question': question, 'answer': answer, 'pred': output}

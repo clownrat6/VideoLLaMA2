@@ -53,8 +53,8 @@ def run_inference(args):
             question, 
             model=model,
             tokenizer=tokenizer,
-            do_sample=True,
             modal='video',
+            do_sample=False,
         )
 
         sample_set = {'video_name': video_name, 'question': question, 'answer': answer, 'pred': output}

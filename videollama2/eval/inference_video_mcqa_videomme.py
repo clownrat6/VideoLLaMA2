@@ -272,11 +272,11 @@ def run_inference(args):
                 instruct += f"{cho}\n"
             # instruct += "The best option is: "
             instruct += "Answer with the option\'s letter from the given choices directly and only give the best option. The best answer is: "
-            output = mm_infer(video_tensor, instruct, model=model, tokenizer=tokenizer, do_sample=False, modal='video')
+            output = mm_infer(video_tensor, instruct, model=model, tokenizer=tokenizer, modal='video', do_sample=False)
             new_record['questions'][idx]['response'] = videomme_dump(record, instruct, options, output)
 
             instruct = f"This video's subtitles are listed below:\n{subtitle}\n" + instruct
-            output = mm_infer(video_tensor, instruct, model=model, tokenizer=tokenizer, do_sample=False, modal='video')
+            output = mm_infer(video_tensor, instruct, model=model, tokenizer=tokenizer, modal='video', do_sample=False)
             new_record_sub['questions'][idx]['response'] = videomme_dump(record, instruct, options, output)
 
         ans_file.write(json.dumps(new_record) + ",\n")

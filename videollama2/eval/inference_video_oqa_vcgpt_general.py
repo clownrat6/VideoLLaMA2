@@ -97,13 +97,13 @@ def run_inference(args):
         question = questions[0]
         answer = answers[0]
 
-        output = x_infer(
+        output = mm_infer(
             video_tensor,
             question,
             model=model,
             tokenizer=tokenizer,
-            do_sample=False,
             modal='video',
+            do_sample=False,
         )
 
         qa = {'video_name': video_name, 'Q': question, 'A': answer, 'P': output}

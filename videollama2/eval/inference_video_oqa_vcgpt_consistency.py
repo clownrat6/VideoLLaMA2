@@ -108,8 +108,8 @@ def run_inference(args):
             question1, 
             model=model,
             tokenizer=tokenizer,
-            do_sample=False,
             modal='video',
+            do_sample=False,
         )
 
         output2 = mm_infer(

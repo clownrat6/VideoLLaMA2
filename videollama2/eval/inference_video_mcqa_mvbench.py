@@ -175,8 +175,8 @@ def run_inference(args):
             instruct,
             model=model,
             tokenizer=tokenizer,
-            do_sample=False,
             modal='video',
+            do_sample=False,
         )
 
         pred_idx = mvbench_dump(vid, instruct, letters, options, output)
