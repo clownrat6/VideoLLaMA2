@@ -32,7 +32,7 @@ class Videollama2Qwen2Config(Qwen2Config):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.model_type = "videollama2_mixtral"
+        self.model_type = "videollama2_qwen2"
 
 
 class Videollama2Qwen2Model(Videollama2MetaModel, Qwen2Model):
