@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import sys
 sys.path.append('./')
-from videollama2 import model_init, x_infer
+from videollama2 import model_init, mm_infer
 from videollama2.utils import disable_torch_init
 
 
@@ -93,7 +93,7 @@ def run_inference(args):
     questions = get_chunk(questions, args.num_chunks, args.chunk_idx)
 
     assert args.batch_size == 1, "Batch size must be 1 for inference"
-    dataset = PerceptionTestMCQADataset(questions, processor)
+    dataset = PerceptionTestMCQADataset(questions, processor['video'])
     dataloader = DataLoader(dataset, shuffle=False, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=collate_fn)
 
     answer_file = os.path.expanduser(args.answer_file)
@@ -116,13 +116,13 @@ def run_inference(args):
             question_id = question_ids[idx]
             _options = options[idx]
 
-            output = x_infer(
+            output = mm_infer(
                 video_tensor,
                 instruct,
-                mode='vanilla',
                 model=model,
                 tokenizer=tokenizer,
-                do_sample=False
+                do_sample=False,
+                modal='video',
             )
 
             output = output.replace('answer', '')

@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import sys
 sys.path.append('./')
-from videollama2 import model_init, x_infer
+from videollama2 import model_init, mm_infer
 from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
@@ -158,7 +158,7 @@ def run_inference(args):
     os.makedirs(os.path.dirname(answer_file), exist_ok=True)
     ans_file = open(answer_file, "w")
 
-    val_loader = build_mvbench_eval(args, processor)
+    val_loader = build_mvbench_eval(args, processor['video'])
 
     # NOTE: only support batch size 1 for now
     for i, line in enumerate(tqdm(val_loader)):
@@ -170,13 +170,13 @@ def run_inference(args):
         options   = list(zip(*line['options']))[0]
         answer_idx = line['answer_idx'][0].item()
 
-        output = x_infer(
+        output = mm_infer(
             video_tensor,
             instruct,
-            mode='vanilla',
             model=model,
             tokenizer=tokenizer,
-            do_sample=False
+            do_sample=False,
+            modal='video',
         )
 
         pred_idx = mvbench_dump(vid, instruct, letters, options, output)

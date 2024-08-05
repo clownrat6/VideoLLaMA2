@@ -11,39 +11,49 @@ from .mm_utils import process_image, process_video, tokenizer_multimodal_token, 
 from .constants import NUM_FRAMES, DEFAULT_IMAGE_TOKEN, DEFAULT_VIDEO_TOKEN, MODAL_INDEX_MAP
 
 
-def model_init(model_path=None):
+def model_init(model_path=None, **kwargs):
     model_path = "DAMO-NLP-SG/VideoLLaMA2-7B" if model_path is None else model_path
     model_name = get_model_name_from_path(model_path)
-    tokenizer, model, processor, context_len = load_pretrained_model(model_path, None, model_name)
+    tokenizer, model, processor, context_len = load_pretrained_model(model_path, None, model_name, **kwargs)
 
-    if tokenizer.unk_token is not None: 
+    if tokenizer.pad_token is None and tokenizer.unk_token is not None:
         tokenizer.pad_token = tokenizer.unk_token
 
     num_frames = model.config.num_frames if hasattr(model.config, "num_frames") else NUM_FRAMES
 
-    return model, partial(process_video, aspect_ratio=None, processor=processor, num_frames=num_frames), tokenizer
+    processor = {
+        'image': partial(process_image, processor=processor, aspect_ratio=None),
+        'video': partial(process_video, processor=processor, aspect_ratio=None, num_frames=num_frames),
+    }
+
+    return model, processor, tokenizer
 
 
-def infer(model, video, instruct, tokenizer, do_sample=False):
+def mm_infer(image_or_video, instruct, model, tokenizer, do_sample=False, modal='video'):
     """inference api of VideoLLaMA2 for video understanding.
 
     Args:
         model: VideoLLaMA2 model.
-        video (torch.Tensor): video tensor (T, C, H, W).
+        image_or_video (torch.Tensor): image tensor (1, C, H, W) / video tensor (T, C, H, W).
         instruct (str): text instruction for understanding video.
         tokenizer: tokenizer.
         do_sample (bool): whether to sample.
-        version (str): conversation template version.
+        modal (str): inference modality.
     Returns:
         str: response of the model.
     """
 
     # 1. text preprocess (tag process & generate prompt).
-    modal_token = DEFAULT_VIDEO_TOKEN
+    if modal == 'image':
+        modal_token = DEFAULT_IMAGE_TOKEN
+    elif modal == 'video':
+        modal_token = DEFAULT_VIDEO_TOKEN
+    else:
+        raise ValueError(f"Unsupported modal: {modal}")
     instruct = modal_token + '\n' + instruct
 
     # 2. vision preprocess (load & transform image or video).
-    tensor = video.half().cuda()
+    tensor = image_or_video.half().cuda()
 
     if model.config.model_type in ['videollama2', 'videollama2_mistral', 'videollama2_mixtral']:
         system_message = [
@@ -56,7 +66,14 @@ def infer(model, video, instruct, tokenizer, do_sample=False):
     else:
         system_message = []
 
-    message = system_message + [{'role': 'user', 'content': instruct}]
+    if isinstance(instruct, str):
+        message = [{'role': 'user', 'content': instruct}]
+    elif isinstance(instruct, list):
+        message = copy.deepcopy(instruct)
+    else:
+        raise ValueError(f"Unsupported type of instruct: {type(instruct)}")
+
+    message = system_message + message
     prompt = tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=True)
 
     input_ids = tokenizer_multimodal_token(prompt, tokenizer, modal_token, return_tensors='pt').unsqueeze(0).long().cuda()
@@ -84,15 +101,3 @@ def infer(model, video, instruct, tokenizer, do_sample=False):
     outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
 
     return outputs
-
-
-def x_infer(video, question, model, tokenizer, mode='vanilla', do_sample=False):
-    if mode == 'mcqa':
-        instruction = f'{question}\nAnswer with the option\'s letter from the given choices directly and only give the best option.'
-        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample)
-    elif mode == 'openend':
-        instruction = f'{question}\nAnswer the question using a single word or a short phrase with multiple words.'
-        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample)
-    elif mode == 'vanilla':
-        instruction = question
-        return infer(model=model, tokenizer=tokenizer, video=video, instruct=instruction, do_sample=do_sample)

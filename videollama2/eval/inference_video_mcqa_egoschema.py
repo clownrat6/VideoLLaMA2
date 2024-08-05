@@ -11,7 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import sys
 sys.path.append('./')
-from videollama2 import model_init, x_infer
+from videollama2 import model_init, mm_infer
 from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
@@ -110,20 +110,20 @@ def run_inference(args):
     os.makedirs(os.path.dirname(answer_file), exist_ok=True)
     ans_file = open(answer_file, "w")
 
-    val_loader = build_egoschema_eval(args, processor)
+    val_loader = build_egoschema_eval(args, processor['video'])
 
     # Iterate over each sample in the ground truth file
     for i, line in enumerate(tqdm(val_loader)):
         video_tensor = line['video'][0]
         instruct = line['instruct'][0]
 
-        pred = x_infer(
+        pred = mm_infer(
             video_tensor,
             instruct,
-            mode='vanilla',
             model=model,
             tokenizer=tokenizer,
             do_sample=False,
+            modal='video',
         )
 
         egoschema_dump(ans_file, line, [pred])

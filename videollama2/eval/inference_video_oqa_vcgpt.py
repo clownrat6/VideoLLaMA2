@@ -92,7 +92,7 @@ def run_inference(args):
     gt_answers = get_chunk(gt_answers, args.num_chunks, args.chunk_idx)
 
     assert args.batch_size == 1, "Batch size must be 1 for inference"
-    dataset = VCGPTDataset(gt_questions, gt_answers, processor)
+    dataset = VCGPTDataset(gt_questions, gt_answers, processor['video'])
     dataloader = DataLoader(dataset, shuffle=False, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=collate_fn)
 
     answer_file = os.path.join(args.output_file)
@@ -111,11 +111,11 @@ def run_inference(args):
 
         output = x_infer(
             video_tensor,
-            question, 
-            mode='vanilla',
+            question,
             model=model,
             tokenizer=tokenizer,
-            do_sample=False
+            do_sample=False,
+            modal='video',
         )
 
         sample_set = {'id': question_id, 'question': question, 'answer': answer, 'pred': output}

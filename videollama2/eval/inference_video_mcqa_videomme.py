@@ -17,7 +17,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import sys
 sys.path.append('./')
-from videollama2 import model_init, x_infer
+from videollama2 import model_init, mm_infer
 from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
@@ -239,7 +239,7 @@ def run_inference(args):
     ans_file = open(answer_file, "w")
     ans_sub_file = open(answer_sub_file, "w")
 
-    val_loader = build_videomme_eval(args, processor)
+    val_loader = build_videomme_eval(args, processor['video'])
 
     # Iterate over each sample in the ground truth file
     for i, (videos, subtitles, records) in enumerate(tqdm(val_loader)):
@@ -272,11 +272,11 @@ def run_inference(args):
                 instruct += f"{cho}\n"
             # instruct += "The best option is: "
             instruct += "Answer with the option\'s letter from the given choices directly and only give the best option. The best answer is: "
-            output = x_infer(video_tensor, instruct, mode='vanilla', model=model, tokenizer=tokenizer, do_sample=False)
+            output = mm_infer(video_tensor, instruct, model=model, tokenizer=tokenizer, do_sample=False, modal='video')
             new_record['questions'][idx]['response'] = videomme_dump(record, instruct, options, output)
 
             instruct = f"This video's subtitles are listed below:\n{subtitle}\n" + instruct
-            output = x_infer(video_tensor, instruct, mode='vanilla', model=model, tokenizer=tokenizer, do_sample=False)
+            output = mm_infer(video_tensor, instruct, model=model, tokenizer=tokenizer, do_sample=False, modal='video')
             new_record_sub['questions'][idx]['response'] = videomme_dump(record, instruct, options, output)
 
         ans_file.write(json.dumps(new_record) + ",\n")

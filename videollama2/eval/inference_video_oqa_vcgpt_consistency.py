@@ -11,7 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import sys
 sys.path.append('./')
-from videollama2 import model_init, x_infer
+from videollama2 import model_init, mm_infer
 from videollama2.utils import disable_torch_init
 
 # NOTE: Ignore TypedStorage warning, which refers to this link~(https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560)
@@ -84,7 +84,7 @@ def run_inference(args):
     questions = get_chunk(questions, args.num_chunks, args.chunk_idx)
 
     assert args.batch_size == 1, "Batch size must be 1 for inference"
-    dataset = VCGPTDataset(questions, processor)
+    dataset = VCGPTDataset(questions, processor['video'])
     dataloader = DataLoader(dataset, shuffle=False, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=collate_fn)
 
     answer_file = os.path.expanduser(args.answer_file)
@@ -103,22 +103,22 @@ def run_inference(args):
         question2 = questions2[0]
         answer = answers[0]
 
-        output1 = x_infer(
+        output1 = mm_infer(
             video_tensor,
             question1, 
-            mode='vanilla',
             model=model,
             tokenizer=tokenizer,
             do_sample=False,
+            modal='video',
         )
 
-        output2 = x_infer(
+        output2 = mm_infer(
             video_tensor,
-            question2, 
-            mode='vanilla',
+            question2,
             model=model,
             tokenizer=tokenizer,
             do_sample=False,
+            modal='video',
         )
 
         qa = {'video_name': video_name, 'Q1': question1, 'Q2': question2, 'A': answer, 'P1': output1, 'P2': output2}
