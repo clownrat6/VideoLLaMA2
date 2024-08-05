@@ -29,7 +29,7 @@ def model_init(model_path=None, **kwargs):
     return model, processor, tokenizer
 
 
-def mm_infer(image_or_video, instruct, model, tokenizer, do_sample=False, modal='video'):
+def mm_infer(image_or_video, instruct, model, tokenizer, modal='video', **kwargs):
     """inference api of VideoLLaMA2 for video understanding.
 
     Args:
@@ -50,10 +50,14 @@ def mm_infer(image_or_video, instruct, model, tokenizer, do_sample=False, modal=
         modal_token = DEFAULT_VIDEO_TOKEN
     else:
         raise ValueError(f"Unsupported modal: {modal}")
-    instruct = modal_token + '\n' + instruct
 
-    # 2. vision preprocess (load & transform image or video).
-    tensor = image_or_video.half().cuda()
+    if isinstance(instruct, str):
+        message = [{'role': 'user', 'content': modal_token + '\n' + instruct}]
+    elif isinstance(instruct, list):
+        message = copy.deepcopy(instruct)
+        message[0]['content'] = modal_token + '\n' + message[0]['content']
+    else:
+        raise ValueError(f"Unsupported type of instruct: {type(instruct)}")
 
     if model.config.model_type in ['videollama2', 'videollama2_mistral', 'videollama2_mixtral']:
         system_message = [
@@ -66,18 +70,14 @@ def mm_infer(image_or_video, instruct, model, tokenizer, do_sample=False, modal=
     else:
         system_message = []
 
-    if isinstance(instruct, str):
-        message = [{'role': 'user', 'content': instruct}]
-    elif isinstance(instruct, list):
-        message = copy.deepcopy(instruct)
-    else:
-        raise ValueError(f"Unsupported type of instruct: {type(instruct)}")
-
     message = system_message + message
     prompt = tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=True)
 
     input_ids = tokenizer_multimodal_token(prompt, tokenizer, modal_token, return_tensors='pt').unsqueeze(0).long().cuda()
     attention_masks = input_ids.ne(tokenizer.pad_token_id).long().cuda()
+
+    # 2. vision preprocess (load & transform image or video).
+    tensor = image_or_video.half().cuda()
 
     tensor = [(tensor, modal_token)]
 
@@ -85,14 +85,20 @@ def mm_infer(image_or_video, instruct, model, tokenizer, do_sample=False, modal=
     keywords = [tokenizer.eos_token]
     stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
 
+    do_sample = kwargs.get('do_sample', False)
+    temperature = kwargs.get('temperature', 0.2 if do_sample else 0.0)
+    top_p = kwargs.get('top_p', 0.9)
+    max_new_tokens = kwargs.get('max_new_tokens', 1024)
+
     with torch.inference_mode():
         output_ids = model.generate(
             input_ids,
             attention_mask=attention_masks,
             images=tensor,
             do_sample=do_sample,
-            temperature=0.2 if do_sample else 0.0,
-            max_new_tokens=1024,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+            top_p=top_p,
             use_cache=True,
             stopping_criteria=[stopping_criteria],
             pad_token_id=tokenizer.eos_token_id,
