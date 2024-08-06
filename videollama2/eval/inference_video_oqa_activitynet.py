@@ -28,7 +28,7 @@ def get_chunk(lst, n, k):
     return chunks[k]
 
 
-class VCGPTDataset(Dataset):
+class ActivitynetDataset(Dataset):
 
     video_formats = ['.mp4', '.webm', '.avi', '.mov', '.mkv']
 
@@ -92,7 +92,7 @@ def run_inference(args):
     gt_answers = get_chunk(gt_answers, args.num_chunks, args.chunk_idx)
 
     assert args.batch_size == 1, "Batch size must be 1 for inference"
-    dataset = VCGPTDataset(gt_questions, gt_answers, processor['video'])
+    dataset = ActivitynetDataset(gt_questions, gt_answers, processor['video'])
     dataloader = DataLoader(dataset, shuffle=False, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=collate_fn)
 
     answer_file = os.path.join(args.output_file)

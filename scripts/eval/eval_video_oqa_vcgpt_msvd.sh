@@ -18,7 +18,7 @@ if [ ! -f "$output_file" ]; then
     for IDX in $(seq 0 $((CHUNKS-1))); do
         # select the GPUs for the task
         gpu_devices=$(IFS=,; echo "${GPULIST[*]:$(($IDX*$GPUS_PER_TASK)):$GPUS_PER_TASK}")
-        TRANSFORMERS_OFFLINE=1 CUDA_VISIBLE_DEVICES=${gpu_devices} python3 videollama2/eval/inference_video_oqa_vcgpt.py \
+        TRANSFORMERS_OFFLINE=1 CUDA_VISIBLE_DEVICES=${gpu_devices} python3 videollama2/eval/inference_video_oqa_activitynet.py \
             --model-path ${CKPT} \
             --video-folder ${EVAL_DATA_DIR}/MSVD_Zero_Shot_QA/videos \
             --question-file ${EVAL_DATA_DIR}/MSVD_Zero_Shot_QA/test_q.json \
@@ -44,7 +44,7 @@ AZURE_API_KEY=your_key
 AZURE_API_ENDPOINT=your_endpoint
 AZURE_API_DEPLOYNAME=your_deployname
 
-python3 videollama2/eval/eval_video_oqa_vcgpt.py \
+python3 videollama2/eval/eval_video_oqa_activitynet.py \
     --pred-path ${output_file} \
     --output-dir ${OUTPUT_DIR}/MSVD_Zero_Shot_QA/answers/${CKPT_NAME}/gpt \
     --output-json ${OUTPUT_DIR}/MSVD_Zero_Shot_QA/answers/${CKPT_NAME}/results.json \
