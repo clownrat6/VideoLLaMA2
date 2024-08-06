@@ -114,7 +114,7 @@ class Videollama2MetaForCausalLM(ABC):
 
     def encode_images_or_videos(self, images):
         num_frames = self.config.num_frames if hasattr(self.config, 'num_frames') else NUM_FRAMES
-        
+
         data_batch = []
         for i, (data, modal) in enumerate(images):
             if modal == 'image':

@@ -27,6 +27,7 @@ from .videollama2_mistral import Videollama2MistralForCausalLM, Videollama2Mistr
 from .videollama2_mixtral import Videollama2MixtralForCausalLM, Videollama2MixtralConfig
 from .videollama2_qwen2 import Videollama2Qwen2ForCausalLM, Videollama2Qwen2Config
 from .videollama2_gemma2 import Videollama2Gemma2ForCausalLM, Videollama2Gemma2Config
+from .videollama2_phi3 import Videollama2Phi3ForCausalLM, Videollama2Phi3Config
 
 
 VLLMs = {
@@ -36,6 +37,7 @@ VLLMs = {
     "videollama2_mixtral": Videollama2MixtralForCausalLM,
     "videollama2_qwen2": Videollama2Qwen2ForCausalLM,
     "videollama2_gemma2": Videollama2Gemma2ForCausalLM,
+    "videollama2_phi3": Videollama2Phi3ForCausalLM,
 }
 
 
@@ -137,6 +139,10 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                 model = Videollama2MixtralForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
             elif 'qwen2' in model_base.lower():
                 model = Videollama2Qwen2ForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
+            elif 'gemma2' in model_base.lower():
+                model = Videollama2Gemma2ForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
+            elif 'phi3' in model_base.lower():
+                model = Videollama2Phi3ForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
             else:
                 model = Videollama2MistralForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
 
@@ -165,6 +171,10 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
             elif 'qwen2' in model_base.lower():
                 tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False, token=token)
                 model = Videollama2Qwen2ForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, **kwargs)
+            elif 'gemma2' in model_base.lower():
+                model = Videollama2Gemma2ForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
+            elif 'phi3' in model_base.lower():
+                model = Videollama2Phi3ForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
             else:
                 # NOTE: mistral-based model is our default model.
                 tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False, token=token)
