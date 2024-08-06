@@ -185,7 +185,7 @@ def build_videomme_eval(args, processor):
 def videomme_dump(record, instruct, options, output):
     letters = ['A', 'B', 'C', 'D']
 
-    num2eng = {
+    digit2word = {
         '1': 'one',
         '2': 'two',
         '3': 'three',
@@ -207,8 +207,8 @@ def videomme_dump(record, instruct, options, output):
             for idx, opt in enumerate(options):
                 # Arabic numerals -> English words
                 opt2 = opt
-                if opt in num2eng:
-                    opt2 = num2eng[opt]
+                if opt in digit2word:
+                    opt2 = digit2word[opt]
                 if opt.lower() in output.lower() or opt2.lower() in output.lower():
                     pred_idx = idx
                     find_flag = True
