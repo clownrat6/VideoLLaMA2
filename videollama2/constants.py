@@ -21,7 +21,12 @@ NUM_FRAMES = 8
 MAX_FRAMES = 32
 NUM_FRAMES_PER_SECOND = 1
 
+# Audio arguments
+AUDIO_TOKEN_INDEX = -202
+DEFAULT_AUDIO_TOKEN = "<audio>"
+
 MODAL_INDEX_MAP = {
     "<image>": -200,
     "<video>": -201,
+    "<audio>": -202,
 }
