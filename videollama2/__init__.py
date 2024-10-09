@@ -3,8 +3,7 @@ from functools import partial
 
 import torch
 
-from .model import Videollama2LlamaForCausalLM, Videollama2MistralForCausalLM, Videollama2MixtralForCausalLM, Videollama2Qwen2ForCausalLM
-from .model.builder import load_pretrained_model
+from .model import load_pretrained_model, Videollama2LlamaForCausalLM, Videollama2MistralForCausalLM, Videollama2MixtralForCausalLM, Videollama2Qwen2ForCausalLM
 from .conversation import conv_templates, SeparatorStyle
 from .mm_utils import process_video, tokenizer_MMODAL_token, get_model_name_from_path, KeywordsStoppingCriteria
 from .constants import NUM_FRAMES, DEFAULT_MMODAL_TOKEN, DEFAULT_MMODAL_START_TOKEN, DEFAULT_MMODAL_END_TOKEN, MMODAL_TOKEN_INDEX
@@ -48,8 +47,7 @@ def infer(model, video, instruct, tokenizer, do_sample=False, version='llama2'):
     """
 
     # 1. vision preprocess (load & transform image or video).
-    tensor = [video.half().cuda()]
-    modals = ["video"]
+    images = [("video", video.half().cuda())]
 
     # 2. text preprocess (tag process & generate prompt).
     modal_token = DEFAULT_MMODAL_TOKEN['VIDEO']
@@ -74,8 +72,7 @@ def infer(model, video, instruct, tokenizer, do_sample=False, version='llama2'):
         output_ids = model.generate(
             input_ids,
             attention_mask=attention_masks,
-            images_or_videos=tensor,
-            modal_list=modals,
+            images=images,
             do_sample=do_sample,
             temperature=0.2 if do_sample else 0.0,
             max_new_tokens=1024,
