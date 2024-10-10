@@ -102,7 +102,6 @@ class DataArguments:
     data_folder: Optional[str] = field(default=None)
     # Loading Arguments
     is_multimodal: bool = False
-    lazy_preprocess: bool = False
     num_frames: Optional[int] = field(default=None)
     # Preprocess Arguments
     image_aspect_ratio: str = 'square'
