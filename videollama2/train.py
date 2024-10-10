@@ -31,7 +31,6 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, Lambda, ToTensor
 
-import cv2
 import decord
 import imageio
 import numpy as np
@@ -725,7 +724,14 @@ class LazySupervisedDataset(Dataset):
             # NOTE: for sharegpt data in the sft stage, we use the default IMAGE as modal token
             MODAL_list.append('IMAGE')
 
-        data_dict = preprocess(sources, self.tokenizer, MODAL_list=MODAL_list)
+        try:
+            data_dict = preprocess(sources, self.tokenizer, MODAL_list=MODAL_list)
+        except:
+            traceback.print_exc()
+            backup_idx = random.randint(0, len(self.list_data_dict)-1)
+            print(f"Encounted error when processing conversation {sources}, use {backup_idx}-th example instead!!!")
+            return self.__getitem__(backup_idx)
+
         if isinstance(i, int):
             data_dict = dict(input_ids=data_dict["input_ids"][0], labels=data_dict["labels"][0])
 
