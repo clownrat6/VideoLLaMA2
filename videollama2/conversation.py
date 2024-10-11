@@ -16,6 +16,7 @@ class SeparatorStyle(Enum):
     LLAMA2 = auto()
     QWEN = auto()
 
+
 @dataclasses.dataclass
 class Conversation:
     """A class that keeps all conversation history."""
