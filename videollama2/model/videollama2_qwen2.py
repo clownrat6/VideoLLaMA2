@@ -20,31 +20,35 @@ import torch
 import torch.nn as nn
 
 from transformers import AutoConfig, AutoModelForCausalLM, \
-                         LlamaConfig, LlamaModel, LlamaForCausalLM
+                         Qwen2Config, Qwen2Model, Qwen2ForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
 
-from ..videollama2_arch import Videollama2MetaModel, Videollama2MetaForCausalLM
+from .videollama2_arch import Videollama2MetaModel, Videollama2MetaForCausalLM
 
 
-class Videollama2Config(LlamaConfig):
-    model_type = "videollama2_llama"
+class Videollama2Qwen2Config(Qwen2Config):
+    model_type = "videollama2_qwen2"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model_type = "videollama2_qwen2"
 
 
-class Videollama2LlamaModel(Videollama2MetaModel, LlamaModel):
-    config_class = Videollama2Config
+class Videollama2Qwen2Model(Videollama2MetaModel, Qwen2Model):
+    config_class = Videollama2Qwen2Config
 
-    def __init__(self, config: LlamaConfig):
-        super(Videollama2LlamaModel, self).__init__(config)
+    def __init__(self, config: Videollama2Qwen2Config):
+        super(Videollama2Qwen2Model, self).__init__(config)
 
 
-class Videollama2LlamaForCausalLM(LlamaForCausalLM, Videollama2MetaForCausalLM):
-    config_class = Videollama2Config
+class Videollama2Qwen2ForCausalLM(Qwen2ForCausalLM, Videollama2MetaForCausalLM):
+    config_class = Videollama2Qwen2Config
 
     def __init__(self, config, **kwargs):
-        super(LlamaForCausalLM, self).__init__(config)
-        self.model = Videollama2LlamaModel(config)
-        self.pretraining_tp = config.pretraining_tp
+        super(Qwen2ForCausalLM, self).__init__(config)
+        self.model = Videollama2Qwen2Model(config)
+        # self.pretraining_tp = config.pretraining_tp
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
@@ -144,5 +148,5 @@ class Videollama2LlamaForCausalLM(LlamaForCausalLM, Videollama2MetaForCausalLM):
         return _inputs
 
 
-AutoConfig.register("videollama2_llama", Videollama2Config)
-AutoModelForCausalLM.register(Videollama2Config, Videollama2LlamaForCausalLM)
+AutoConfig.register("videollama2_qwen2", Videollama2Qwen2Config)
+AutoModelForCausalLM.register(Videollama2Qwen2Config, Videollama2Qwen2ForCausalLM)

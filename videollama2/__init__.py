@@ -3,8 +3,7 @@ from functools import partial
 
 import torch
 
-from .model import Videollama2LlamaForCausalLM, Videollama2MistralForCausalLM, Videollama2MixtralForCausalLM, Videollama2Qwen2ForCausalLM
-from .model.builder import load_pretrained_model
+from .model import load_pretrained_model, Videollama2LlamaForCausalLM, Videollama2MistralForCausalLM, Videollama2MixtralForCausalLM, Videollama2Qwen2ForCausalLM
 from .conversation import conv_templates, SeparatorStyle
 from .mm_utils import process_video, tokenizer_MMODAL_token, get_model_name_from_path, KeywordsStoppingCriteria
 from .constants import NUM_FRAMES, DEFAULT_MMODAL_TOKEN, DEFAULT_MMODAL_START_TOKEN, DEFAULT_MMODAL_END_TOKEN, MMODAL_TOKEN_INDEX
