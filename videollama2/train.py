@@ -1010,7 +1010,6 @@ def train(attn_implementation=None):
                     if training_args.bf16 and module.weight.dtype == torch.float32:
                         module = module.to(torch.bfloat16)
 
-    print("Current model:", model)
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     # select a Trainer
     trainer = VideoLLaMA2Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
