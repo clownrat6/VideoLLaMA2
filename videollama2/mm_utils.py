@@ -4,7 +4,6 @@ import base64
 from io import BytesIO
 
 import torch
-import decord
 import imageio
 import numpy as np
 from PIL import Image
@@ -12,224 +11,16 @@ from decord import VideoReader, cpu
 from moviepy.editor import VideoFileClip
 from transformers import StoppingCriteria
 
-from scenedetect import open_video, SceneManager
-from scenedetect.detectors import ContentDetector
-from scenedetect.stats_manager import StatsManager
-
 from .constants import NUM_FRAMES, MAX_FRAMES, NUM_FRAMES_PER_SECOND, MMODAL_INDEX_TOKEN, IMAGE_TOKEN_INDEX
 
 
-def merge_scenes(cut_list, cut_scores, scene_list,num_frames,max_scene_num=4, num_frame_per_scene=8, min_frames_per_scene=30):
-    if len(scene_list) == len(cut_list) and len(scene_list) == 0:
-        frame_ids = np.linspace(0, num_frames-1, num_frame_per_scene, dtype=int)  # only one scene for current video
-        return [frame_ids]
-
-    scene_list, cut_results = merge_scenes_not_exeed_max_scene_num(cut_list,cut_scores,scene_list, max_scene_num)
-
-    prev_cut_point = 0
-    list_of_scene_frames = [] 
-    for (cur_cut_point, _) in cut_results:
-        frame_ids = list(np.linspace(prev_cut_point, cur_cut_point-1, num_frame_per_scene, dtype=int))
-        list_of_scene_frames.append(frame_ids)
-        prev_cut_point = cur_cut_point
-    if cur_cut_point < num_frames:
-        frame_ids = np.linspace(cur_cut_point, num_frames-1, num_frame_per_scene, dtype=int)
-        list_of_scene_frames.append(frame_ids)
-
-    return list_of_scene_frames
-
-
-def merge_scenes_not_exeed_max_scene_num(cut_list,cut_scores, scene_list, max_scene_num):
-    cut_frames = [ele.get_frames() for ele in cut_list]
-    cut_results = list(zip(cut_frames, cut_scores))
-    while len(scene_list) > max_scene_num:
-        min_idx = np.argmin(cut_scores)
-        cut_frames = [ele for idx, ele in enumerate(cut_frames) if idx != min_idx]
-        cut_scores = [ele for idx, ele in enumerate(cut_scores) if idx != min_idx]
-
-        # merge scene list
-        num_scenes = len(scene_list)
-        #print("Current min_idx:", min_idx)
-        s1 = scene_list[min_idx]
-        s2 = scene_list[min_idx+1]
-        new_scene = (s1[0], s2[1])
-        if min_idx == 0:
-            # merge the first two scenes
-            new_scene_list = [new_scene] + scene_list[2:]
-        elif min_idx == num_scenes - 1:
-            # # merge the last two scenes
-            new_scene_list = scene_list[:min_idx-1] + [new_scene]
-        else:
-            new_scene_list = scene_list[:min_idx] + [new_scene] + scene_list[min_idx+2:]
-        scene_list = new_scene_list
-        cut_results = list(zip(cut_frames, cut_scores))
-    return scene_list, cut_results
-
-
-def split_video_into_scenes(video_path, threshold=27.0, max_scene_num=10, num_frame_per_scene=8):
-    # Open video, create a scene manager, and add a detector.
-    video = open_video(video_path)
-    stats_manager = StatsManager()
-    scene_manager = SceneManager(stats_manager)
-    detector = ContentDetector(threshold=threshold)
-    scene_manager.add_detector(detector)
-    scene_manager.detect_scenes(video)
-    scene_list = scene_manager.get_scene_list()
-    cut_list = scene_manager.get_cut_list()
-    num_frames = video.duration.get_frames()
-    if len(scene_list) == len(cut_list) and len(scene_list) == 0:
-        frame_ids = np.linspace(0, num_frames-1, num_frame_per_scene, dtype=int)  # only one scene for current video
-        return [frame_ids]
-    assert len(scene_list) == len(cut_list) + 1, f"inconsistent lengths for scene list ({len(scene_list)}) vs. cut list ({len(cut_list)})"
-    cut_frames = [ele.get_frames() for ele in cut_list]
-    cut_scores = [stats_manager.get_metrics(f, ["delta_lum"])[0] for f in cut_frames]
-    cut_results = list(zip(cut_frames, cut_scores))
-    #print(f"Original cut scores: {cut_scores}, original scene list: {scene_list}")
-    while len(scene_list) > max_scene_num:
-        min_idx = np.argmin(cut_scores)
-        cut_frames = [ele for idx, ele in enumerate(cut_frames) if idx != min_idx]
-        cut_scores = [ele for idx, ele in enumerate(cut_scores) if idx != min_idx]
-
-        # merge scene list
-        num_scenes = len(scene_list)
-        #print("Current min_idx:", min_idx)
-        s1 = scene_list[min_idx]
-        s2 = scene_list[min_idx+1]
-        new_scene = (s1[0], s2[1])
-        if min_idx == 0:
-            # merge the first two scenes
-            new_scene_list = [new_scene] + scene_list[2:]
-        elif min_idx == num_scenes - 1:
-            # # merge the last two scenes
-            new_scene_list = scene_list[:min_idx-1] + [new_scene]
-        else:
-            new_scene_list = scene_list[:min_idx] + [new_scene] + scene_list[min_idx+2:]
-        scene_list = new_scene_list
-        cut_results = list(zip(cut_frames, cut_scores))
-    #print(f"Cut scores after merging: {cut_scores}, scene list: {scene_list}")
-    prev_cut_point = 0
-    list_of_scene_frames = [] 
-    for (cur_cut_point, _) in cut_results:
-        frame_ids = list(np.linspace(prev_cut_point, cur_cut_point-1, num_frame_per_scene, dtype=int))
-        list_of_scene_frames.append(frame_ids)
-        prev_cut_point = cur_cut_point
-    if cur_cut_point < num_frames:
-        frame_ids = np.linspace(cur_cut_point, num_frames-1, num_frame_per_scene, dtype=int)
-        list_of_scene_frames.append(frame_ids)
-    # print(f"Finally got {len(list_of_scene_frames)} scenes where we evenly sampled {num_frame_per_scene} frames for each scene")
-    return list_of_scene_frames
-
-
-def select_best_resolution(original_size, possible_resolutions):
+def disable_torch_init():
     """
-    Selects the best resolution from a list of possible resolutions based on the original size.
-    Args:
-        original_size (tuple): The original size of the image in the format (width, height).
-        possible_resolutions (list): A list of possible resolutions in the format [(width1, height1), (width2, height2), ...].
-    Returns:
-        tuple: The best fit resolution in the format (width, height).
+    Disable the redundant torch default initialization to accelerate model creation.
     """
-    original_width, original_height = original_size
-    best_fit = None
-    max_effective_resolution = 0
-    min_wasted_resolution = float('inf')
-    for width, height in possible_resolutions:
-        scale = min(width / original_width, height / original_height)
-        downscaled_width, downscaled_height = int(original_width * scale), int(original_height * scale)
-        effective_resolution = min(downscaled_width * downscaled_height, original_width * original_height)
-        wasted_resolution = (width * height) - effective_resolution
-        if effective_resolution > max_effective_resolution or (effective_resolution == max_effective_resolution and wasted_resolution < min_wasted_resolution):
-            max_effective_resolution = effective_resolution
-            min_wasted_resolution = wasted_resolution
-            best_fit = (width, height)
-    return best_fit
-
-
-def resize_and_pad_image(image, target_resolution):
-    """
-    Resize and pad an image to a target resolution while maintaining aspect ratio.
-    Args:
-        image (PIL.Image.Image): The input image.
-        target_resolution (tuple): The target resolution (width, height) of the image.
-    Returns:
-        PIL.Image.Image: The resized and padded image.
-    """
-    original_width, original_height = image.size
-    target_width, target_height = target_resolution
-    scale_w = target_width / original_width
-    scale_h = target_height / original_height
-    if scale_w < scale_h:
-        new_width = target_width
-        new_height = min(math.ceil(original_height * scale_w), target_height)
-    else:
-        new_height = target_height
-        new_width = min(math.ceil(original_width * scale_h), target_width)
-    # Resize the image
-    resized_image = image.resize((new_width, new_height))
-    new_image = Image.new('RGB', (target_width, target_height), (0, 0, 0))
-    paste_x = (target_width - new_width) // 2
-    paste_y = (target_height - new_height) // 2
-    new_image.paste(resized_image, (paste_x, paste_y))
-    return new_image
-
-
-def divide_to_patches(image, patch_size):
-    """
-    Divides an image into patches of a specified size.
-    Args:
-        image (PIL.Image.Image): The input image.
-        patch_size (int): The size of each patch.
-    Returns:
-        list: A list of PIL.Image.Image objects representing the patches.
-    """
-    patches = []
-    width, height = image.size
-    for i in range(0, height, patch_size):
-        for j in range(0, width, patch_size):
-            box = (j, i, j + patch_size, i + patch_size)
-            patch = image.crop(box)
-            patches.append(patch)
-    return patches
-
-
-def get_anyres_image_grid_shape(image_size, grids, patch_size):
-    """
-    Calculate the shape of the image patch grid after the preprocessing for images of any resolution.
-    Args:
-        image_size (tuple): The size of the input image in the format (width, height).
-        grids (str, List[tuple[int]]): Patch segmentation grid.
-        patch_size (int): The size of each image patch.
-    Returns:
-        tuple: The shape of the image patch grid in the format (width, height).
-    """
-    if type(grids) is list:
-        possible_resolutions = [(x * patch_size, y * patch_size) for x, y in grids]
-    else:
-        possible_resolutions = [(x * patch_size, y * patch_size) for x, y in ast.literal_eval(grids)]
-    width, height = select_best_resolution(image_size, possible_resolutions)
-    return width // patch_size, height // patch_size
-
-
-def process_anyres_image(image, grids, patch_size):
-    """
-    Process an image with variable resolutions.
-    Args:
-        image (PIL.Image.Image): The input image to be processed.
-        grids (str, List[tuple[int]]): Patch segmentation grid.
-        patch_size (int): The size of the patches to be extracted.
-    Returns:
-        torch.Tensor: A tensor containing the processed image patches.
-    """
-    if type(grids) is list:
-        possible_resolutions = [(x * patch_size, y * patch_size) for x, y in grids]
-    else:
-        possible_resolutions = [(x * patch_size, y * patch_size) for x, y in ast.literal_eval(grids)]
-    best_resolution = select_best_resolution(image.size, possible_resolutions)
-    image_padded = resize_and_pad_image(image, best_resolution)
-    patches = divide_to_patches(image_padded, patch_size)
-    image_original_resize = resize_and_pad_image(image, (patch_size, patch_size))
-    image_patches = [image_original_resize] + patches
-    return image_patches
+    import torch
+    setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
+    setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
 
 
 def chunk_list(input_list, chunk_size):
