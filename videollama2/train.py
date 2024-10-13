@@ -92,7 +92,7 @@ class ModelArguments:
     mm_vision_select_feature: Optional[str] = field(default="patch")
     # Other Arguments
     mm_use_im_start_end: bool = field(default=False)
-    mm_use_im_patch_token: bool = field(default=True)
+    mm_use_im_patch_token: bool = field(default=False)
     pretrain_model_name_or_path: Optional[str] = field(default=None, metadata={"help": "To train from previously trained checkpoints. E.g, further fine-tuning based on the finetuned version of the whole model."})
 
 
