@@ -22,7 +22,7 @@ import torch
 from transformers import PretrainedConfig, AutoTokenizer, AutoModelForCausalLM, AutoConfig, BitsAndBytesConfig
 
 from .projector import load_mm_projector
-from .videollama2_llama import Videollama2LlamaForCausalLM, Videollama2Config
+from .videollama2_llama import Videollama2LlamaForCausalLM, Videollama2LlamaConfig
 from .videollama2_mistral import Videollama2MistralForCausalLM, Videollama2MistralConfig
 from .videollama2_mixtral import Videollama2MixtralForCausalLM, Videollama2MixtralConfig
 from .videollama2_qwen2 import Videollama2Qwen2ForCausalLM, Videollama2Qwen2Config

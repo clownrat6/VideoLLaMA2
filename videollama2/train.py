@@ -832,7 +832,7 @@ def train(attn_implementation=None):
         pretrain_model_name_or_path = model_args.model_name_or_path
     if model_args.vision_tower is not None:
         if 'vicuna' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2LlamaConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2LlamaForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -843,7 +843,7 @@ def train(attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         elif 'mistral' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2MistralConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2MistralForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -854,7 +854,7 @@ def train(attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         elif 'mixtral' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2MixtralConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2MixtralForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -867,7 +867,7 @@ def train(attn_implementation=None):
             import deepspeed
             deepspeed.utils.set_z3_leaf_modules(model, [MixtralSparseMoeBlock])
         elif 'qwen2' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2Qwen2Config.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2Qwen2ForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -878,7 +878,7 @@ def train(attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         else:
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2Mistral.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2MistralForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
