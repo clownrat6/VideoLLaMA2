@@ -59,91 +59,6 @@ def expand2square(pil_img, background_color):
         return result
 
 
-def process_images(images, image_processor, model_cfg):
-    image_aspect_ratio = getattr(model_cfg, "image_aspect_ratio", None)
-    new_images = []
-    #print("Current image_aspect_ratio:", image_aspect_ratio)
-    if image_aspect_ratio == 'pad':
-        for image in images:
-            image = expand2square(image, tuple(int(x*255) for x in image_processor.image_mean))
-            image = image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-            new_images.append(image)
-    else:
-        return image_processor(images, return_tensors='pt')['pixel_values']
-    if all(x.shape == new_images[0].shape for x in new_images):
-        new_images = torch.stack(new_images, dim=0)
-    return new_images
-
-
-def process_videos(frames, image_processor, model_cfg):
-    # this function only used during inference
-    # image_aspect_ratio = getattr(model_cfg, "image_aspect_ratio", None)
-    # new_frames = []
-    # print("Current image_aspect_ratio:", image_aspect_ratio)
-    # if image_aspect_ratio == 'pad':
-    #     for image in frames:
-    #         image = Image.fromarray(image)
-    #         image = expand2square(image, tuple(int(x*255) for x in image_processor.image_mean))
-    #         image = image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-    #         new_frames.append(image)
-    # else:
-    #     return image_processor(frames, return_tensors='pt')['pixel_values']
-    # if all(x.shape == new_frames[0].shape for x in new_frames):
-    #     new_frames = torch.stack(new_frames, dim=0)
-    new_frames = image_processor.preprocess(frames, return_tensors='pt')['pixel_values']  # do not pad for video frames
-    return new_frames
-
-
-def create_photo_grid(arr, rows=None, cols=None):
-    """
-    Create a photo grid from a 4D numpy array with shape [t, h, w, c].
-
-    Parameters:
-        arr (numpy.ndarray): Input array with shape [t, h, w, c].
-        rows (int): Optional. Number of rows in the grid. If not set, it will be determined based on `cols` or the square root of `t`.
-        cols (int): Optional. Number of columns in the grid. If not set, it will be determined based on `rows` or the square root of `t`.
-
-    Returns:
-        numpy.ndarray: A 3D numpy array representing the photo grid.
-    """
-
-    if isinstance(arr, list):
-        if isinstance(arr[0], Image.Image):
-            arr = np.stack([np.array(img) for img in arr])
-        elif isinstance(arr[0], np.ndarray):
-            arr = np.stack(arr)
-        else:
-            raise ValueError("Invalid input type. Expected list of Images or numpy arrays.")
-
-    t, h, w, c = arr.shape
-    
-    # Calculate the number of rows and columns if not provided
-    if rows is None and cols is None:
-        rows = math.ceil(math.sqrt(t))
-        cols = math.ceil(t / rows)
-    elif rows is None:
-        rows = math.ceil(t / cols)
-    elif cols is None:
-        cols = math.ceil(t / rows)
-
-    # Check if the grid can hold all the images
-    if rows * cols < t:
-        raise ValueError(f"Not enough grid cells ({rows}x{cols}) to hold all images ({t}).")
-    
-    # Create the grid array with appropriate height and width
-    grid_height = h * rows
-    grid_width = w * cols
-    grid = np.zeros((grid_height, grid_width, c), dtype=arr.dtype)
-    
-    # Fill the grid with images
-    for i in range(t):
-        row_idx = i // cols
-        col_idx = i % cols
-        grid[row_idx*h:(row_idx+1)*h, col_idx*w:(col_idx+1)*w, :] = arr[i]
-    
-    return grid
-
-
 def process_image(image_path, processor, aspect_ratio='pad', num_frames=NUM_FRAMES, image_grid=False):
     image = Image.open(image_path).convert('RGB')
 
@@ -252,28 +167,6 @@ def process_video(video_path, processor, aspect_ratio='pad', num_frames=NUM_FRAM
         video = processor.preprocess(images, return_tensors='pt')['pixel_values']
 
     return video
-
-
-def tokenizer_image_token(prompt, tokenizer, image_token_index=IMAGE_TOKEN_INDEX, return_tensors=None):
-    prompt_chunks = [tokenizer(chunk).input_ids for chunk in prompt.split('<image>')]
-
-    def insert_separator(X, sep):
-        return [ele for sublist in zip(X, [sep]*len(X)) for ele in sublist][:-1]
-
-    input_ids = []
-    offset = 0
-    if len(prompt_chunks) > 0 and len(prompt_chunks[0]) > 0 and prompt_chunks[0][0] == tokenizer.bos_token_id:
-        offset = 1
-        input_ids.append(prompt_chunks[0][0])
-
-    for x in insert_separator(prompt_chunks, [image_token_index] * (offset + 1)):
-        input_ids.extend(x[offset:])
-
-    if return_tensors is not None:
-        if return_tensors == 'pt':
-            return torch.tensor(input_ids, dtype=torch.long)
-        raise ValueError(f'Unsupported tensor type: {return_tensors}')
-    return input_ids
 
 
 def tokenizer_MMODAL_token(prompt, tokenizer, MMODAL_token_index=IMAGE_TOKEN_INDEX, return_tensors=None):

@@ -31,7 +31,6 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, Lambda, ToTensor
 
-import cv2
 import decord
 import imageio
 import numpy as np
@@ -43,8 +42,8 @@ from transformers.models.mixtral.modeling_mixtral import MixtralSparseMoeBlock
 sys.path.append('./')
 from videollama2 import conversation as conversation_lib
 from videollama2.model import *
-from videollama2.constants import NUM_FRAMES, IGNORE_INDEX, MMODAL_TOKEN_INDEX, DEFAULT_MMODAL_TOKEN, DEFAULT_MMODAL_START_TOKEN, DEFAULT_MMODAL_END_TOKEN
-from videollama2.mm_utils import tokenizer_MMODAL_token, tokenizer_image_token, expand2square, process_video, process_image
+from videollama2.constants import NUM_FRAMES, IGNORE_INDEX, MMODAL_TOKEN_INDEX, DEFAULT_MMODAL_TOKEN
+from videollama2.mm_utils import tokenizer_MMODAL_token, process_video, process_image
 from videollama2.videollama2_trainer import (
     VideoLLaMA2Trainer,
     maybe_zero_3, get_mm_adapter_state_maybe_zero_3,
@@ -91,8 +90,6 @@ class ModelArguments:
     mm_vision_select_layer: Optional[int] = field(default=-1)
     mm_vision_select_feature: Optional[str] = field(default="patch")
     # Other Arguments
-    mm_use_im_start_end: bool = field(default=False)
-    mm_use_im_patch_token: bool = field(default=False)
     pretrain_model_name_or_path: Optional[str] = field(default=None, metadata={"help": "To train from previously trained checkpoints. E.g, further fine-tuning based on the finetuned version of the whole model."})
 
 
@@ -105,7 +102,6 @@ class DataArguments:
     data_folder: Optional[str] = field(default=None)
     # Loading Arguments
     is_multimodal: bool = False
-    lazy_preprocess: bool = False
     num_frames: Optional[int] = field(default=None)
     # Preprocess Arguments
     image_aspect_ratio: str = 'square'
@@ -264,8 +260,6 @@ def preprocess_multimodal(sources: Sequence[str], data_args: DataArguments) -> D
                     if "mmtag" in conversation_lib.default_conversation.version:
                         sentence['value'] = sentence['value'].replace(DEFAULT_TOKEN, f'<{MODAL_TYPE.capitalize()}>' + DEFAULT_TOKEN + f'</{MODAL_TYPE.capitalize()}>')
                 replace_token = DEFAULT_TOKEN
-                if data_args.mm_use_im_start_end and MODAL_TYPE is not None:
-                    replace_token = DEFAULT_MMODAL_START_TOKEN[MODAL_TYPE.upper()] + replace_token + DEFAULT_MMODAL_START_TOKEN[MODAL_TYPE.upper()]
                 sentence["value"] = sentence["value"].replace(DEFAULT_TOKEN, replace_token)
 
     return sources
@@ -295,7 +289,6 @@ def preprocess_qwen(
 
     # 2. Tokenize conversations
     if len(MODAL_list) > 0:
-        # input_ids = torch.stack([tokenizer_image_token(prompt, tokenizer, return_tensors='pt') for prompt in conversations], dim=0)
         input_ids = torch.stack([tokenizer_MMODAL_token(prompt, tokenizer, MMODAL_TOKEN_INDEX[MODAL_list[i]], return_tensors='pt') for i, prompt in enumerate(conversations)], dim=0)
     else:
         input_ids = tokenizer(
@@ -388,7 +381,6 @@ def preprocess_llama2(
 
     # Tokenize conversations
     if len(MODAL_list) > 0:
-        # input_ids = torch.stack([tokenizer_image_token(prompt, tokenizer, return_tensors='pt') for prompt in conversations], dim=0)
         input_ids = torch.stack([tokenizer_MMODAL_token(prompt, tokenizer, MMODAL_TOKEN_INDEX[MODAL_list[i]], return_tensors='pt') for i, prompt in enumerate(conversations)], dim=0)
     else:
         input_ids = tokenizer(
@@ -421,8 +413,6 @@ def preprocess_llama2(
             parts[0] += sep
 
             if len(MODAL_list) > 0:
-                # round_len = len(tokenizer_image_token(rou, tokenizer))
-                # instruction_len = len(tokenizer_image_token(parts[0], tokenizer)) - 2
                 round_len = len(tokenizer_MMODAL_token(rou, tokenizer, MMODAL_TOKEN_INDEX[MODAL_list[idx]]))
                 instruction_len = len(tokenizer_MMODAL_token(parts[0], tokenizer, MMODAL_TOKEN_INDEX[MODAL_list[idx]])) - 2
             else:
@@ -474,7 +464,6 @@ def preprocess_v1(
 
     # Tokenize conversations
     if len(MODAL_list) > 0:
-        # input_ids = torch.stack([tokenizer_image_token(prompt, tokenizer, return_tensors='pt') for prompt in conversations], dim=0)
         input_ids = torch.stack([tokenizer_MMODAL_token(prompt, tokenizer, MMODAL_TOKEN_INDEX[MODAL_list[i]], return_tensors='pt') for i, prompt in enumerate(conversations)], dim=0)
     else:
         input_ids = tokenizer(
@@ -508,8 +497,6 @@ def preprocess_v1(
             parts[0] += sep
 
             if len(MODAL_list) > 0:
-                # round_len = len(tokenizer_image_token(rou, tokenizer)) 
-                # instruction_len = len(tokenizer_image_token(parts[0], tokenizer)) - 2
                 # fix the issue of tokenization mismatch
                 round_len = len(tokenizer_MMODAL_token(rou, tokenizer, MMODAL_TOKEN_INDEX[MODAL_list[idx]]))
                 instruction_len = len(tokenizer_MMODAL_token(parts[0], tokenizer, MMODAL_TOKEN_INDEX[MODAL_list[idx]])) - 2
@@ -708,7 +695,7 @@ class LazySupervisedDataset(Dataset):
             image_file = os.path.join(self.data_args.data_folder, image_file)
 
             try:
-                image = process_image(image_file, image_processor, self.data_args.image_aspect_ratio)[0]
+                image = process_image(image_file, image_processor, aspect_ratio=self.data_args.image_aspect_ratio)[0]
             except Exception as e:
                 traceback.print_exc()
                 backup_idx = random.randint(0, len(self.list_data_dict)-1)
@@ -722,7 +709,7 @@ class LazySupervisedDataset(Dataset):
             video_file = os.path.join(self.data_args.data_folder, video_file)
 
             try: 
-                video = process_video(video_file, video_processor, self.data_args.image_aspect_ratio, num_frames)
+                video = process_video(video_file, video_processor, aspect_ratio=self.data_args.image_aspect_ratio, num_frames=num_frames)
             except Exception as e:
                 traceback.print_exc()
                 backup_idx = random.randint(0, len(self.list_data_dict)-1)
@@ -736,7 +723,14 @@ class LazySupervisedDataset(Dataset):
             # NOTE: for sharegpt data in the sft stage, we use the default IMAGE as modal token
             MODAL_list.append('IMAGE')
 
-        data_dict = preprocess(sources, self.tokenizer, MODAL_list=MODAL_list)
+        try:
+            data_dict = preprocess(sources, self.tokenizer, MODAL_list=MODAL_list)
+        except:
+            traceback.print_exc()
+            backup_idx = random.randint(0, len(self.list_data_dict)-1)
+            print(f"Encounted error when processing conversation {sources}, use {backup_idx}-th example instead!!!")
+            return self.__getitem__(backup_idx)
+
         if isinstance(i, int):
             data_dict = dict(input_ids=data_dict["input_ids"][0], labels=data_dict["labels"][0])
 
@@ -746,8 +740,7 @@ class LazySupervisedDataset(Dataset):
             data_dict['video'] = video
         elif self.data_args.is_multimodal:
             # image does not exist in the data, but the model is multimodal
-            crop_size = self.data_args.image_processor.crop_size
-            data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
+            data_dict['image'] = torch.zeros(3, self.data_args.image_size, self.data_args.image_size)
         return data_dict
 
 
@@ -839,7 +832,7 @@ def train(attn_implementation=None):
         pretrain_model_name_or_path = model_args.model_name_or_path
     if model_args.vision_tower is not None:
         if 'vicuna' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2LlamaConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2LlamaForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -850,7 +843,7 @@ def train(attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         elif 'mistral' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2MistralConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2MistralForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -861,7 +854,7 @@ def train(attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         elif 'mixtral' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2MixtralConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2MixtralForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -874,7 +867,7 @@ def train(attn_implementation=None):
             import deepspeed
             deepspeed.utils.set_z3_leaf_modules(model, [MixtralSparseMoeBlock])
         elif 'qwen2' in model_args.model_name_or_path.lower():
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2Qwen2Config.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2Qwen2ForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -885,7 +878,7 @@ def train(attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         else:
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            config = Videollama2Mistral.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config._attn_implementation = attn_implementation
             model = Videollama2MistralForCausalLM.from_pretrained(
                 pretrain_model_name_or_path,
@@ -981,6 +974,7 @@ def train(attn_implementation=None):
         data_args.image_processor = vision_tower.image_processor
         data_args.video_processor = vision_tower.video_processor if hasattr(vision_tower, "video_processor") else vision_tower.image_processor
 
+        data_args.image_size = vision_tower.image_size
         data_args.is_multimodal = True
 
         model.config.image_aspect_ratio = data_args.image_aspect_ratio
@@ -1001,12 +995,7 @@ def train(attn_implementation=None):
         if training_args.bits in [4, 8]:
             model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
 
-        model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_projector_lr = training_args.mm_projector_lr
-        training_args.use_im_start_end = model_args.mm_use_im_start_end
-        model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
-        model.initialize_MM_tokenizer(model_args, tokenizer=tokenizer)
-
         model.config.num_frames = NUM_FRAMES if data_args.num_frames is None else data_args.num_frames
 
     if training_args.bits in [4, 8]:
@@ -1022,7 +1011,6 @@ def train(attn_implementation=None):
                     if training_args.bf16 and module.weight.dtype == torch.float32:
                         module = module.to(torch.bfloat16)
 
-    print("Current model:", model)
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     # select a Trainer
     trainer = VideoLLaMA2Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
