@@ -21,9 +21,9 @@ fi
 echo "WORLD_SIZE: $WORLD_SIZE"
 echo "NPROC_PER_NODE: $NPROC_PER_NODE"
 
-MODEL_PATH=work_dirs/videollama3_qwen2vl_qwen2_1.5b/STAGE3_VIDEO_V0_128f10k
-DATA_ROOT=/mnt/damovl/EVAL_BENCH/VIDEO/tempcompass
-SAVE_PATH=eval_output/tempcompass_response_128f10k_fix.json
+MODEL_PATH=work_dirs/videollama2qwen2.5_vllava/finetune_siglip_tcv35_7b_16f
+DATA_ROOT=datasets/benchs/tempcompass
+SAVE_PATH=eval_output/tempcompass_response.json
 
 torchrun --nnodes $WORLD_SIZE \
     --nproc_per_node $NPROC_PER_NODE \

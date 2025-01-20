@@ -22,8 +22,8 @@ echo "WORLD_SIZE: $WORLD_SIZE"
 echo "NPROC_PER_NODE: $NPROC_PER_NODE"
 
 MODEL_PATH=work_dirs/videollama2qwen2.5_vllava/finetune_siglip_tcv35_7b_16f
-DATA_ROOT=datasets/benchs/egoschema
-SAVE_PATH=eval_output/egoschema_response.json
+DATA_ROOT=datasets/benchs/perception_test
+SAVE_PATH=eval_output/perception_test_response.json
 
 torchrun --nnodes $WORLD_SIZE \
     --nproc_per_node $NPROC_PER_NODE \
@@ -32,6 +32,6 @@ torchrun --nnodes $WORLD_SIZE \
     --node_rank $RANK \
     evaluation/evaluate.py \
     --model_path ${MODEL_PATH} \
-    --benchmark egoschema \
+    --benchmark perception_test \
     --data_root ${DATA_ROOT} \
     --save_path ${SAVE_PATH} \
